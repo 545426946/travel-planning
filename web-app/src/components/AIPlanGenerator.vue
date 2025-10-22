@@ -1,0 +1,368 @@
+<template>
+  <div class="ai-plan-generator">
+    <!-- AI规划按钮 -->
+    <a-button 
+      type="primary" 
+      size="large" 
+      @click="showAIModal = true"
+      class="ai-plan-btn"
+    >
+      <template #icon><RobotOutlined /></template>
+      AI智能规划
+    </a-button>
+
+    <!-- AI规划模态框 -->
+    <a-modal
+      v-model:open="showAIModal"
+      title="AI智能旅行规划"
+      width="800px"
+      :confirm-loading="generating"
+      :ok-text="generating ? '生成中...' : '开始规划'"
+      @ok="handleAIGenerate"
+      @cancel="handleCancel"
+    >
+      <a-form
+        ref="aiFormRef"
+        :model="aiForm"
+        :rules="aiRules"
+        layout="vertical"
+      >
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="目的地" name="destination">
+              <a-input 
+                v-model:value="aiForm.destination" 
+                placeholder="例如：北京、上海、杭州"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="旅行天数" name="days">
+              <a-select v-model:value="aiForm.days" placeholder="选择天数">
+                <a-select-option :value="1">1天</a-select-option>
+                <a-select-option :value="2">2天</a-select-option>
+                <a-select-option :value="3">3天</a-select-option>
+                <a-select-option :value="4">4天</a-select-option>
+                <a-select-option :value="5">5天</a-select-option>
+                <a-select-option :value="7">7天</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="预算（元）" name="budget">
+              <a-input-number 
+                v-model:value="aiForm.budget" 
+                :min="100" 
+                :max="100000"
+                style="width: 100%"
+                placeholder="总预算金额"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="出行人数" name="travelers">
+              <a-input-number 
+                v-model:value="aiForm.travelers" 
+                :min="1" 
+                :max="10"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-form-item label="兴趣偏好" name="interests">
+          <a-checkbox-group v-model:value="aiForm.interests">
+            <a-checkbox value="culture">文化历史</a-checkbox>
+            <a-checkbox value="nature">自然风光</a-checkbox>
+            <a-checkbox value="food">美食体验</a-checkbox>
+            <a-checkbox value="shopping">购物休闲</a-checkbox>
+            <a-checkbox value="adventure">冒险探索</a-checkbox>
+            <a-checkbox value="relaxation">放松度假</a-checkbox>
+          </a-checkbox-group>
+        </a-form-item>
+
+        <a-form-item label="旅行风格" name="travelStyle">
+          <a-radio-group v-model:value="aiForm.travelStyle">
+            <a-radio value="budget">经济实惠</a-radio>
+            <a-radio value="comfort">舒适享受</a-radio>
+            <a-radio value="luxury">奢华体验</a-radio>
+          </a-radio-group>
+        </a-form-item>
+
+        <a-form-item label="特殊要求" name="specialRequirements">
+          <a-textarea 
+            v-model:value="aiForm.specialRequirements" 
+            placeholder="例如：带老人小孩、饮食禁忌、特殊需求等"
+            :rows="3"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 规划结果展示 -->
+    <a-modal
+      v-model:open="showResultModal"
+      title="AI旅行规划结果"
+      width="900px"
+      :footer="null"
+    >
+      <div v-if="aiPlanResult" class="ai-plan-result">
+        <a-alert 
+          message="AI为您生成的旅行计划" 
+          description="以下是根据您的需求智能生成的详细行程安排"
+          type="success"
+          show-icon
+          class="result-alert"
+        />
+
+        <div class="plan-summary">
+          <h3>{{ aiPlanResult.title }}</h3>
+          <a-descriptions :column="2" bordered size="small">
+            <a-descriptions-item label="天数">{{ aiPlanResult.days }}天</a-descriptions-item>
+            <a-descriptions-item label="预算">¥{{ aiPlanResult.budget }}</a-descriptions-item>
+            <a-descriptions-item label="出行人数">{{ aiForm.travelers }}人</a-descriptions-item>
+            <a-descriptions-item label="目的地">{{ aiForm.destination }}</a-descriptions-item>
+          </a-descriptions>
+        </div>
+
+        <div class="itinerary-section">
+          <h4>📅 每日行程安排</h4>
+          <a-timeline>
+            <a-timeline-item 
+              v-for="(day, index) in aiPlanResult.itinerary" 
+              :key="index"
+            >
+              <template #dot>
+                <a-tag color="blue">第{{ index + 1 }}天</a-tag>
+              </template>
+              <div class="day-activities">
+                <div v-for="(activity, i) in day.activities" :key="i" class="activity">
+                  • {{ activity }}
+                </div>
+              </div>
+            </a-timeline-item>
+          </a-timeline>
+        </div>
+
+        <div class="tips-section">
+          <h4>💡 旅行贴士</h4>
+          <a-list size="small">
+            <a-list-item v-for="(tip, index) in aiPlanResult.tips" :key="index">
+              {{ tip }}
+            </a-list-item>
+          </a-list>
+        </div>
+
+        <div class="action-buttons">
+          <a-button type="primary" @click="saveAIPlan">
+            <template #icon><SaveOutlined /></template>
+            保存为我的行程
+          </a-button>
+          <a-button @click="regeneratePlan">
+            <template #icon><ReloadOutlined /></template>
+            重新生成
+          </a-button>
+          <a-button @click="showResultModal = false">关闭</a-button>
+        </div>
+      </div>
+    </a-modal>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { message } from 'ant-design-vue'
+import mistralService from '../services/mistralService'
+import supabaseService from '../services/supabaseService'
+
+const emit = defineEmits(['plan-saved'])
+
+const showAIModal = ref(false)
+const showResultModal = ref(false)
+const generating = ref(false)
+const aiFormRef = ref()
+
+const aiForm = ref({
+  destination: '',
+  days: 3,
+  budget: 2000,
+  travelers: 2,
+  interests: ['culture', 'food'],
+  travelStyle: 'comfort',
+  specialRequirements: ''
+})
+
+const aiRules = {
+  destination: [{ required: true, message: '请输入目的地', trigger: 'blur' }],
+  days: [{ required: true, message: '请选择旅行天数', trigger: 'change' }],
+  budget: [{ required: true, message: '请输入预算', trigger: 'blur' }],
+  travelers: [{ required: true, message: '请输入出行人数', trigger: 'blur' }]
+}
+
+const aiPlanResult = ref(null)
+
+const handleAIGenerate = async () => {
+  try {
+    await aiFormRef.value.validate()
+    generating.value = true
+    
+    // 调用Mistral AI服务生成规划
+    const plan = await mistralService.generateTravelPlan(aiForm.value)
+    aiPlanResult.value = plan
+    
+    showAIModal.value = false
+    showResultModal.value = true
+    
+    message.success('AI规划生成成功！')
+  } catch (error) {
+    console.error('AI规划生成失败:', error)
+    message.error('规划生成失败，请检查输入信息')
+  } finally {
+    generating.value = false
+  }
+}
+
+const handleCancel = () => {
+  showAIModal.value = false
+  aiFormRef.value.resetFields()
+}
+
+const saveAIPlan = async () => {
+  try {
+    // 保存行程基本信息到数据库
+    const saveResult = await supabaseService.savePlan({
+      title: aiPlanResult.value.title,
+      description: aiPlanResult.value.description,
+      days: aiPlanResult.value.days,
+      budget: aiPlanResult.value.budget,
+      travelers: aiForm.value.travelers,
+      destination: aiForm.value.destination,
+      itinerary: aiPlanResult.value.itinerary,
+      tips: aiPlanResult.value.tips,
+      is_ai_generated: true
+    })
+
+    if (saveResult.success) {
+      // 保存详细的行程活动数据
+      const activities = []
+      aiPlanResult.value.itinerary.forEach(day => {
+        if (day.activities && Array.isArray(day.activities)) {
+          day.activities.forEach(activity => {
+            activities.push({
+              day_number: day.day,
+              time_slot: activity.time_slot,
+              activity_title: activity.activity_title,
+              activity_description: activity.activity_description,
+              location: activity.location,
+              estimated_cost: activity.estimated_cost,
+              duration_minutes: activity.duration_minutes,
+              start_time: activity.start_time,
+              end_time: activity.end_time,
+              order_index: activity.order_index || 0
+            })
+          })
+        }
+      })
+
+      if (activities.length > 0) {
+        await supabaseService.savePlanActivities(saveResult.data.id, activities)
+      }
+
+      message.success('AI行程已成功保存到数据库')
+      // 触发父组件更新
+      emit('plan-saved', saveResult.data)
+      showResultModal.value = false
+    } else {
+      message.error('保存失败：' + saveResult.error)
+    }
+  } catch (error) {
+    console.error('保存AI行程失败:', error)
+    message.error('保存失败，请重试')
+  }
+}
+
+const regeneratePlan = async () => {
+  showResultModal.value = false
+  showAIModal.value = true
+}
+</script>
+
+<style scoped>
+.ai-plan-generator {
+  margin: 20px 0;
+}
+
+.ai-plan-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ai-plan-result {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.result-alert {
+  margin-bottom: 20px;
+}
+
+.plan-summary {
+  margin: 20px 0;
+}
+
+.plan-summary h3 {
+  color: #1890ff;
+  margin-bottom: 16px;
+}
+
+.itinerary-section {
+  margin: 30px 0;
+}
+
+.itinerary-section h4 {
+  color: #52c41a;
+  margin-bottom: 16px;
+}
+
+.day-activities {
+  margin-left: 20px;
+}
+
+.activity {
+  margin: 4px 0;
+  color: #666;
+}
+
+.tips-section {
+  margin: 30px 0;
+}
+
+.tips-section h4 {
+  color: #faad14;
+  margin-bottom: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+:deep(.ant-timeline-item-content) {
+  padding-bottom: 20px;
+}
+
+:deep(.ant-list-item) {
+  padding: 8px 0;
+}
+</style>

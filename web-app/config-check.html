@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置检查 - 旅行规划应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .config-form {
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .test-section {
+            margin-top: 30px;
+        }
+        
+        .test-btn {
+            background: #48bb78;
+            margin-bottom: 20px;
+        }
+        
+        .test-btn:hover {
+            background: #38a169;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        .success {
+            border-left: 4px solid #48bb78;
+            color: #2d3748;
+        }
+        
+        .error {
+            border-left: 4px solid #f56565;
+            color: #742a2a;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Supabase配置检查</h1>
+        <p class="subtitle">验证您的Supabase数据库连接配置</p>
+        
+        <div class="config-form">
+            <div class="form-group">
+                <label for="supabaseUrl">Supabase项目URL</label>
+                <input type="url" id="supabaseUrl" placeholder="https://your-project-ref.supabase.co">
+            </div>
+            
+            <div class="form-group">
+                <label for="supabaseKey">Supabase匿名密钥</label>
+                <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+            </div>
+            
+            <button class="btn" onclick="saveConfig()">保存配置</button>
+        </div>
+        
+        <div class="test-section hidden" id="testSection">
+            <button class="btn test-btn" onclick="runConnectionTest()">测试数据库连接</button>
+            
+            <div class="loading" id="loading">测试中...</div>
+            
+            <div class="results hidden" id="results">
+                <h3>测试结果</h3>
+                <div id="resultList"></div>
+            </div>
+        </div>
+        
+        <div class="help-section">
+            <h3>如何获取配置信息？</h3>
+            <ol>
+                <li>访问 <a href="https://supabase.com" target="_blank">Supabase官网</a></li>
+                <li>创建新项目或选择现有项目</li>
+                <li>进入项目设置 → API设置</li>
+                <li>复制"Project URL"和"anon/public"密钥</li>
+                <li>粘贴到上面的表单中</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // 从localStorage加载保存的配置
+        function loadSavedConfig() {
+            const savedUrl = localStorage.getItem('supabaseUrl');
+            const savedKey = localStorage.getItem('supabaseKey');
+            
+            if (savedUrl) document.getElementById('supabaseUrl').value = savedUrl;
+            if (savedKey) document.getElementById('supabaseKey').value = savedKey;
+            
+            if (savedUrl && savedKey) {
+                document.getElementById('testSection').classList.remove('hidden');
+            }
+        }
+        
+        // 保存配置到localStorage
+        function saveConfig() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                alert('请填写完整的配置信息');
+                return;
+            }
+            
+            localStorage.setItem('supabaseUrl', url);
+            localStorage.setItem('supabaseKey', key);
+            
+            document.getElementById('testSection').classList.remove('hidden');
+            alert('配置已保存！现在可以测试连接。');
+        }
+        
+        // 运行连接测试
+        async function runConnectionTest() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                alert('请先保存配置信息');
+                return;
+            }
+            
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const resultList = document.getElementById('resultList');
+            
+            loading.style.display = 'block';
+            results.classList.add('hidden');
+            resultList.innerHTML = '';
+            
+            try {
+                // 动态加载Supabase客户端
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+                const supabase = createClient(url, key);
+                
+                const testResults = [];
+                
+                // 测试1: 基本连接
+                try {
+                    const startTime = Date.now();
+                    const { data, error } = await supabase.from('cities').select('count').limit(1);
+                    const endTime = Date.now();
+                    
+                    testResults.push({
+                        name: '数据库连接',
+                        success: !error,
+                        message: error ? `连接失败: ${error.message}` : `连接成功 (${endTime - startTime}ms)`,
+                        details: error ? null : '数据库连接正常'
+                    });
+                } catch (error) {
+                    testResults.push({
+                        name: '数据库连接',
+                        success: false,
+                        message: `连接失败: ${error.message}`,
+                        details: null
+                    });
+                }
+                
+                // 测试2: 表结构检查
+                const tables = ['cities', 'plan_templates', 'attractions'];
+                const tableResults = [];
+                
+                for (const table of tables) {
+                    try {
+                        const { error } = await supabase.from(table).select('*').limit(1);
+                        tableResults.push({
+                            table,
+                            exists: !error || error.code !== '42P01',
+                            error: error ? error.message : null
+                        });
+                    } catch (error) {
+                        tableResults.push({
+                            table,
+                            exists: false,
+                            error: error.message
+                        });
+                    }
+                }
+                
+                const missingTables = tableResults.filter(r => !r.exists).map(r => r.table);
+                testResults.push({
+                    name: '表结构检查',
+                    success: missingTables.length === 0,
+                    message: missingTables.length === 0 ? '所有必需表都存在' : `缺少表: ${missingTables.join(', ')}`,
+                    details: tableResults
+                });
+                
+                // 显示结果
+                displayResults(testResults);
+                
+            } catch (error) {
+                testResults.push({
+                    name: '配置验证',
+                    success: false,
+                    message: `配置错误: ${error.message}`,
+                    details: null
+                });
+                displayResults(testResults);
+            } finally {
+                loading.style.display = 'none';
+                results.classList.remove('hidden');
+            }
+        }
+        
+        // 显示测试结果
+        function displayResults(testResults) {
+            const resultList = document.getElementById('resultList');
+            resultList.innerHTML = '';
+            
+            testResults.forEach(result => {
+                const item = document.createElement('div');
+                item.className = `result-item ${result.success ? 'success' : 'error'}`;
+                
+                let detailsHtml = '';
+                if (result.details && Array.isArray(result.details)) {
+                    detailsHtml = '<div style="margin-top: 10px; font-size: 0.9em;">';
+                    result.details.forEach(detail => {
+                        const status = detail.exists ? '✅' : '❌';
+                        detailsHtml += `<div>${status} ${detail.table}`;
+                        if (detail.error) detailsHtml += ` - ${detail.error}`;
+                        detailsHtml += '</div>';
+                    });
+                    detailsHtml += '</div>';
+                }
+                
+                item.innerHTML = `
+                    <strong>${result.success ? '✅' : '❌'} ${result.name}</strong>
+                    <div>${result.message}</div>
+                    ${detailsHtml}
+                `;
+                
+                resultList.appendChild(item);
+            });
+        }
+        
+        // 页面加载时加载保存的配置
+        document.addEventListener('DOMContentLoaded', loadSavedConfig);
+    </script>
+</body>
+</html>

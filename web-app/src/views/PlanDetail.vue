@@ -1,266 +1,227 @@
 <template>
   <div class="plan-detail">
-    <!-- 头部信息 -->
-    <div class="plan-header">
-      <a-button type="link" @click="$router.back()" class="back-btn">
-        <template #icon><ArrowLeftOutlined /></template>
-        返回
-      </a-button>
-      
-      <div class="header-content">
-        <h1>{{ plan.title }}</h1>
-        <p class="plan-description">{{ plan.description }}</p>
-        
-        <div class="plan-meta">
-          <a-space :size="24">
-            <span><CalendarOutlined /> {{ plan.days }}天行程</span>
-            <span><DollarOutlined /> 预算: ¥{{ plan.budget }}</span>
-            <span><UserOutlined /> {{ plan.travelers }}人</span>
-            <span><EnvironmentOutlined /> {{ plan.destination }}</span>
-            <a-tag :color="getStatusColor(plan.status)">{{ getStatusText(plan.status) }}</a-tag>
-          </a-space>
-        </div>
-        
-        <div class="header-actions">
-          <a-space>
-            <a-button type="primary" @click="showEditModal = true">
-              <template #icon><EditOutlined /></template>
-              编辑行程
-            </a-button>
-            <a-button @click="exportPlan">
-              <template #icon><ExportOutlined /></template>
-              导出
-            </a-button>
-            <a-popconfirm
-              title="确定要删除这个行程吗？"
-              @confirm="deletePlan"
-            >
-              <a-button danger>
-                <template #icon><DeleteOutlined /></template>
-                删除
-              </a-button>
-            </a-popconfirm>
-          </a-space>
-        </div>
+    <!-- 返回按钮和调试控制 -->
+    <div class="top-controls">
+      <div class="back-button-container">
+        <button @click="goBack" class="back-button">
+          ← 返回行程列表
+        </button>
+      </div>
+      <div class="action-buttons">
+        <button @click="addNewActivity" class="edit-button">
+          ➕ 添加活动
+        </button>
+        <button @click="toggleDebug" class="toggle-debug-button" title="切换调试模式">
+          {{ showDebug ? '隐藏' : '显示' }}调试
+        </button>
       </div>
     </div>
 
-    <!-- 行程安排 -->
-    <div class="itinerary-section">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>正在加载行程信息...</p>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="error-container">
+      <p class="error-message">{{ error }}</p>
+      <button @click="fetchPlanDetail" class="retry-button">重试</button>
+    </div>
+
+    <!-- 行程内容 -->
+    <template v-else>
+      <!-- 行程基本信息 -->
+      <div class="plan-header">
+        <h1>{{ plan.title || '行程详情' }}</h1>
+        <p class="plan-description">{{ plan.description || '暂无行程描述' }}</p>
+        
+        <!-- 行程元数据 -->
+        <div class="plan-meta">
+          <div class="meta-item">
+            <span class="meta-label">行程天数：</span>
+            <span class="meta-value">{{ plan.days }}天</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">出行人数：</span>
+            <span class="meta-value">{{ plan.travelers }}人</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">预算：</span>
+            <span class="meta-value">¥{{ formatCurrency(plan.budget) }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">目的地：</span>
+            <span class="meta-value">{{ plan.destination || '未指定' }}</span>
+          </div>
+        </div>
+      </div>
+
+    <!-- 活动列表 -->
+    <div class="activities-section">
       <h2>行程安排</h2>
       
-      <!-- AI生成的详细行程 -->
-      <div v-if="plan.is_ai_generated && plan.activities && plan.activities.length > 0" class="ai-itinerary">
-        <a-alert 
-          message="AI智能规划行程" 
-          description="以下是根据您的需求智能生成的详细行程安排，具体到时间段和实际地点"
-          type="info"
-          show-icon
-          class="ai-alert"
-        />
-        
-        <a-tabs v-model:activeKey="activeDay" type="card">
-          <a-tab-pane v-for="day in getUniqueDays()" :key="day" :tab="`第${day}天`">
-            <div class="day-itinerary">
-              <a-timeline>
-                <a-timeline-item v-for="activity in getDayActivities(day)" :key="activity.id">
-                  <template #dot>
-                    <div class="time-dot" :class="getTimeSlotClass(activity.time_slot)">
-                      {{ getTimeSlotText(activity.time_slot) }}
-                    </div>
-                  </template>
-                  
-                  <a-card class="activity-card">
-                    <div class="activity-header">
-                      <h3>{{ activity.activity_title }}</h3>
-                      <div class="activity-time">
-                        <span v-if="activity.start_time">{{ formatTime(activity.start_time) }}</span>
-                        <span v-if="activity.end_time">{{ activity.start_time ? ' - ' : '' }}{{ formatTime(activity.end_time) }}</span>
-                        <span v-if="activity.duration_minutes"> ({{ activity.duration_minutes }}分钟)</span>
-                      </div>
-                    </div>
-                    
-                    <div class="activity-content">
-                      <p>{{ activity.activity_description }}</p>
-                      
-                      <div class="activity-meta">
-                        <a-space>
-                          <span v-if="activity.location"><EnvironmentOutlined /> {{ activity.location }}</span>
-                          <span v-if="activity.estimated_cost"><DollarOutlined /> ¥{{ activity.estimated_cost }}</span>
-                        </a-space>
-                      </div>
-                    </div>
-                  </a-card>
-                </a-timeline-item>
-              </a-timeline>
-            </div>
-          </a-tab-pane>
-        </a-tabs>
+      <!-- 日期切换标签 -->
+      <div class="day-tabs">
+        <button
+          v-for="day in displayDays"
+          :key="day"
+          :class="['day-tab', { active: activeDay === day }]"
+          @click="switchDay(day)"
+        >
+          第{{ day }}天
+        </button>
       </div>
-      
-      <!-- 手动创建的行程 -->
-      <div v-else class="manual-itinerary">
-        <a-tabs v-model:activeKey="activeDay" type="card">
-          <a-tab-pane v-for="day in plan.days" :key="day" :tab="`第${day}天`">
-            <div class="day-itinerary">
-              <a-timeline>
-                <a-timeline-item v-for="activity in getDayActivities(day)" :key="activity.id">
-                  <template #dot>
-                    <div class="time-dot" :class="getTimeSlotClass(activity.time_slot)">
-                      {{ getTimeSlotText(activity.time_slot) }}
-                    </div>
-                  </template>
-                  
-                  <a-card class="activity-card">
-                    <div class="activity-header">
-                      <h3>{{ activity.activity_title }}</h3>
-                      <div class="activity-time">
-                        <span v-if="activity.start_time">{{ formatTime(activity.start_time) }}</span>
-                        <span v-if="activity.end_time"> - {{ formatTime(activity.end_time) }}</span>
-                        <span v-if="activity.duration_minutes"> ({{ activity.duration_minutes }}分钟)</span>
-                      </div>
-                    </div>
-                    
-                    <div class="activity-content">
-                      <p>{{ activity.activity_description }}</p>
-                      
-                      <div class="activity-meta">
-                        <a-space>
-                          <span v-if="activity.location"><EnvironmentOutlined /> {{ activity.location }}</span>
-                          <span v-if="activity.estimated_cost"><DollarOutlined /> ¥{{ activity.estimated_cost }}</span>
-                        </a-space>
-                      </div>
-                    </div>
-                  </a-card>
-                </a-timeline-item>
-              </a-timeline>
-              
-              <div v-if="getDayActivities(day).length === 0" class="no-activities">
-                <a-empty description="暂无活动安排">
-                  <a-button type="primary" @click="addActivity(day)">添加活动</a-button>
-                </a-empty>
+
+      <!-- 当前日期活动列表 -->
+      <div class="day-activities">
+        <div v-if="currentDayActivities.length === 0" class="no-activities">
+          <p>第{{ activeDay }}天暂无安排的活动</p>
+        </div>
+        <div v-else>
+          <div
+            v-for="activity in currentDayActivities"
+          :key="activity.id || `${activity.day_number}-${activity.order_index}`"
+          class="activity-card"
+          @click="handleActivityClick(activity)"
+          >
+            <div class="activity-time-badge">
+              {{ getTimeSlotText(activity.time_slot) }}
+            </div>
+            <div class="activity-image-container">
+              <!-- 直接使用默认占位图，避免图片加载错误 -->
+              <img 
+                :src="getDefaultImage(activity)" 
+                :alt="activity.activity_title" 
+                class="activity-image"
+              >
+            </div>
+            <div class="activity-content">
+              <h3>{{ activity.activity_title }}</h3>
+              <p class="activity-desc">{{ activity.activity_description || '暂无描述' }}</p>
+              <div class="activity-info">
+                <div class="info-item">
+                  <span class="info-label">时间：</span>
+                  <span>{{ formatTime(activity.start_time) }} - {{ formatTime(activity.end_time) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">地点：</span>
+                  <span>{{ activity.location || '未指定' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">花费：</span>
+                  <span>¥{{ formatCurrency(activity.estimated_cost || 0) }}</span>
+                </div>
               </div>
             </div>
-          </a-tab-pane>
-        </a-tabs>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 编辑行程模态框 -->
-    <a-modal
-      v-model:open="showEditModal"
-      title="编辑行程"
-      width="800px"
-      :confirm-loading="editing"
-      @ok="handleEditPlan"
-      @cancel="handleCancelEdit"
-    >
-      <a-form
-        ref="editFormRef"
-        :model="editForm"
-        :rules="editRules"
-        layout="vertical"
-      >
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="行程标题" name="title">
-              <a-input v-model:value="editForm.title" placeholder="请输入行程标题" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="状态" name="status">
-              <a-select v-model:value="editForm.status" placeholder="请选择状态">
-                <a-select-option value="planning">规划中</a-select-option>
-                <a-select-option value="in_progress">进行中</a-select-option>
-                <a-select-option value="completed">已完成</a-select-option>
-                <a-select-option value="cancelled">已取消</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-        </a-row>
-        
-        <a-form-item label="行程描述" name="description">
-          <a-textarea 
-            v-model:value="editForm.description" 
-            placeholder="请输入行程描述"
-            :rows="3"
-          />
-        </a-form-item>
-        
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <a-form-item label="行程天数" name="days">
-              <a-input-number 
-                v-model:value="editForm.days" 
-                :min="1" 
-                :max="30"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="出行人数" name="travelers">
-              <a-input-number 
-                v-model:value="editForm.travelers" 
-                :min="1" 
-                :max="10"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="预算（元）" name="budget">
-              <a-input-number 
-                v-model:value="editForm.budget" 
-                :min="0" 
-                :max="100000"
-                style="width: 100%"
-                :formatter="value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        
-        <a-form-item label="目的地" name="destination">
-          <a-select v-model:value="editForm.destination" placeholder="请选择目的地">
-            <a-select-option value="北京">北京</a-select-option>
-            <a-select-option value="上海">上海</a-select-option>
-            <a-select-option value="杭州">杭州</a-select-option>
-            <a-select-option value="成都">成都</a-select-option>
-            <a-select-option value="广州">广州</a-select-option>
-            <a-select-option value="深圳">深圳</a-select-option>
-          </a-select>
-        </a-form-item>
-      </a-form>
-    </a-modal>
+    <!-- 活动编辑弹窗 -->
+    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>{{ editingActivity ? '编辑活动' : '添加活动' }}</h3>
+          <button @click="closeEditModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>活动标题：</label>
+            <input v-model="editForm.activity_title" type="text" placeholder="请输入活动标题">
+          </div>
+          <div class="form-group">
+            <label>活动描述：</label>
+            <textarea v-model="editForm.activity_description" placeholder="请输入活动描述" rows="3"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>日期：</label>
+              <select v-model="editForm.day_number">
+                <option v-for="day in displayDays" :key="day" :value="day">第{{ day }}天</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>时间段：</label>
+              <select v-model="editForm.time_slot">
+                <option value="morning">上午</option>
+                <option value="afternoon">下午</option>
+                <option value="evening">晚上</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>开始时间：</label>
+              <input v-model="editForm.start_time" type="time">
+            </div>
+            <div class="form-group">
+              <label>结束时间：</label>
+              <input v-model="editForm.end_time" type="time">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>地点：</label>
+            <input v-model="editForm.location" type="text" placeholder="请输入活动地点">
+          </div>
+          <div class="form-group">
+            <label>预估花费：</label>
+            <input v-model="editForm.estimated_cost" type="number" placeholder="0">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeEditModal" class="btn-cancel">取消</button>
+          <button @click="saveActivity" class="btn-save">保存</button>
+          <button v-if="editingActivity" @click="deleteActivity" class="btn-delete">删除</button>
+        </div>
+      </div>
+    </div>
+
+      <!-- 调试信息 -->
+      <div class="debug-info" v-if="showDebug">
+          <h3>调试信息</h3>
+          <p>行程ID：{{ plan.id }}</p>
+          <p>活动总数：{{ plan.activities.length }}</p>
+          <p>当前显示第{{ activeDay }}天</p>
+          <p>当前天数活动数：{{ currentDayActivities.length }}</p>
+          <p>路由参数：{{ JSON.stringify(route.params) }}</p>
+          <div class="debug-buttons">
+            <button @click="toggleDebug" class="debug-toggle">隐藏调试</button>
+          </div>
+        </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
-import { 
-  ArrowLeftOutlined,
-  CalendarOutlined,
-  DollarOutlined,
-  UserOutlined,
-  EnvironmentOutlined,
-  EditOutlined,
-  ExportOutlined,
-  DeleteOutlined
-} from '@ant-design/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import supabaseService from '../services/supabaseService'
+
 
 const route = useRoute()
 const router = useRouter()
-
-const loading = ref(false)
-const editing = ref(false)
-const showEditModal = ref(false)
+const showDebug = ref(false) // 默认隐藏调试信息
 const activeDay = ref(1)
-const editFormRef = ref()
+const loading = ref(false)
+const error = ref(null)
 
+// 编辑相关状态
+const showEditModal = ref(false)
+const editingActivity = ref(null)
+const editForm = ref({
+  activity_title: '',
+  activity_description: '',
+  day_number: 1,
+  time_slot: 'morning',
+  start_time: '',
+  end_time: '',
+  location: '',
+  estimated_cost: 0
+})
+
+// 行程数据（初始空结构）
 const plan = ref({
   id: null,
   title: '',
@@ -273,178 +234,339 @@ const plan = ref({
   activities: []
 })
 
-const editForm = ref({})
-
-const editRules = {
-  title: [{ required: true, message: '请输入行程标题', trigger: 'blur' }],
-  days: [{ required: true, message: '请输入行程天数', trigger: 'blur' }],
-  budget: [{ required: true, message: '请输入预算', trigger: 'blur' }]
-}
-
-// 获取状态颜色
-const getStatusColor = (status) => {
-  const colors = {
-    planning: 'blue',
-    in_progress: 'orange',
-    completed: 'green',
-    cancelled: 'red'
+// 计算属性
+const displayDays = computed(() => {
+  const days = []
+  for (let i = 1; i <= plan.value.days; i++) {
+    days.push(i)
   }
-  return colors[status] || 'default'
-}
+  return days
+})
 
-// 获取状态文本
-const getStatusText = (status) => {
-  const texts = {
-    planning: '规划中',
-    in_progress: '进行中',
-    completed: '已完成',
-    cancelled: '已取消'
+const currentDayActivities = computed(() => {
+  // 确保activities数组存在且不为空
+  if (!plan.value.activities || !Array.isArray(plan.value.activities)) {
+    console.log('没有找到活动数据，plan.value.activities:', plan.value.activities)
+    return []
   }
-  return texts[status] || '未知'
+  
+  // 过滤当前天数的活动并按顺序索引排序
+  const filteredActivities = plan.value.activities
+    .filter(activity => activity.day_number === activeDay.value)
+    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+  
+  console.log(`第${activeDay.value}天的活动:`, filteredActivities)
+  return filteredActivities
+})
+
+// 方法
+const goBack = () => {
+  router.back()
 }
 
-// 获取时间段文本
+// 活动点击处理
+const handleActivityClick = (activity) => {
+  console.log('点击活动:', activity.activity_title)
+  // 点击活动时打开编辑弹窗
+  openEditModal(activity)
+}
+
+const switchDay = (day) => {
+  activeDay.value = day
+  console.log(`切换到第${day}天`)
+}
+
 const getTimeSlotText = (timeSlot) => {
-  const texts = {
+  const slotMap = {
     morning: '上午',
     afternoon: '下午',
     evening: '晚上',
     night: '深夜'
   }
-  return texts[timeSlot] || timeSlot
+  return slotMap[timeSlot] || '未指定'
 }
 
-// 获取时间段样式类
-const getTimeSlotClass = (timeSlot) => {
-  return `time-slot-${timeSlot}`
+// 添加新活动
+const addNewActivity = () => {
+  console.log('添加新活动')
+  openEditModal()
 }
 
-// 获取某天的活动
-const getDayActivities = (day) => {
-  if (!plan.value.activities) return []
-  return plan.value.activities.filter(activity => activity.day_number === day)
-}
-
-// 获取唯一的日期列表
-const getUniqueDays = () => {
-  if (!plan.value.activities) return Array.from({length: plan.value.days}, (_, i) => i + 1)
+// 打开编辑弹窗
+const openEditModal = (activity = null) => {
+  editingActivity.value = activity
   
-  const days = [...new Set(plan.value.activities.map(activity => activity.day_number))]
-  return days.sort((a, b) => a - b)
-}
-
-// 格式化时间
-const formatTime = (timeStr) => {
-  if (!timeStr) return ''
-  return timeStr.substring(0, 5) // 只显示小时和分钟
-}
-
-// 添加活动
-const addActivity = (day) => {
-  message.info(`添加第${day}天的活动`)
-  // 这里可以打开活动编辑模态框
-}
-
-// 导出行程
-const exportPlan = () => {
-  const planData = {
-    title: plan.value.title,
-    description: plan.value.description,
-    days: plan.value.days,
-    budget: plan.value.budget,
-    travelers: plan.value.travelers,
-    destination: plan.value.destination,
-    activities: plan.value.activities
-  }
-  
-  const blob = new Blob([JSON.stringify(planData, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${plan.value.title}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  
-  message.success('行程已导出')
-}
-
-// 编辑行程
-const handleEditPlan = async () => {
-  try {
-    await editFormRef.value.validate()
-    editing.value = true
-    
-    const result = await supabaseService.updatePlan(plan.value.id, editForm.value)
-    if (result.success) {
-      Object.assign(plan.value, result.data)
-      message.success('行程更新成功')
-      showEditModal.value = false
-    } else {
-      message.error('更新失败：' + result.error)
+  if (activity) {
+    // 编辑现有活动
+    editForm.value = { 
+      activity_title: activity.activity_title || '',
+      activity_description: activity.activity_description || '',
+      day_number: activity.day_number || 1,
+      time_slot: activity.time_slot || 'morning',
+      start_time: activity.start_time || '09:00',
+      end_time: activity.end_time || '12:00',
+      location: activity.location || '',
+      estimated_cost: activity.estimated_cost || 0
     }
-  } catch (error) {
-    console.error('编辑行程失败:', error)
-    message.error('编辑失败，请重试')
-  } finally {
-    editing.value = false
+  } else {
+    // 添加新活动
+    editForm.value = {
+      activity_title: '',
+      activity_description: '',
+      day_number: activeDay.value,
+      time_slot: 'morning',
+      start_time: '09:00',
+      end_time: '12:00',
+      location: '',
+      estimated_cost: 0
+    }
   }
+  
+  showEditModal.value = true
 }
 
-// 取消编辑
-const handleCancelEdit = () => {
+// 关闭编辑弹窗
+const closeEditModal = () => {
   showEditModal.value = false
-  resetEditForm()
-}
-
-// 重置编辑表单
-const resetEditForm = () => {
-  editForm.value = { ...plan.value }
-}
-
-// 删除行程
-const deletePlan = async () => {
-  try {
-    const result = await supabaseService.deletePlan(plan.value.id)
-    if (result.success) {
-      message.success('行程已删除')
-      router.push('/plans')
-    } else {
-      message.error('删除失败：' + result.error)
-    }
-  } catch (error) {
-    console.error('删除行程失败:', error)
-    message.error('删除失败，请重试')
+  editingActivity.value = null
+  // 重置表单
+  editForm.value = {
+    activity_title: '',
+    activity_description: '',
+    day_number: 1,
+    time_slot: 'morning',
+    start_time: '09:00',
+    end_time: '12:00',
+    location: '',
+    estimated_cost: 0
   }
 }
 
-// 加载行程详情
-const loadPlanDetail = async () => {
-  loading.value = true
+// 保存活动
+const saveActivity = async () => {
   try {
-    const result = await supabaseService.getPlanDetail(route.params.id)
-    if (result.success) {
-      plan.value = result.data
-      resetEditForm()
-    } else {
-      message.error('加载行程详情失败：' + result.error)
-      router.push('/plans')
+    // 表单验证
+    if (!editForm.value.activity_title.trim()) {
+      alert('请填写活动标题')
+      return
     }
+    
+    if (!editForm.value.start_time || !editForm.value.end_time) {
+      alert('请填写活动时间')
+      return
+    }
+    
+    // 创建活动数据对象
+    const activityData = {
+      plan_id: plan.value.id,
+      activity_title: editForm.value.activity_title.trim(),
+      activity_description: editForm.value.activity_description.trim(),
+      day_number: editForm.value.day_number,
+      time_slot: editForm.value.time_slot,
+      start_time: editForm.value.start_time,
+      end_time: editForm.value.end_time,
+      location: editForm.value.location.trim(),
+      estimated_cost: Number(editForm.value.estimated_cost) || 0,
+      order_index: 0 // 默认排序索引
+    }
+    
+    // 确保行程ID存在
+    if (!plan.value.id || plan.value.id === 'new') {
+      // 如果是新建行程，先保存行程基础信息
+      const planResult = await supabaseService.savePlan({
+        title: plan.value.title || '未命名行程',
+        description: plan.value.description || '',
+        days: plan.value.days || 1,
+        budget: plan.value.budget || 0,
+        travelers: plan.value.travelers || 1,
+        destination: plan.value.destination || '',
+        status: 'planning'
+      })
+      
+      if (planResult.success) {
+        plan.value.id = planResult.data.id
+        activityData.plan_id = plan.value.id
+        console.log('行程已创建，ID:', plan.value.id)
+      } else {
+        throw new Error('创建行程失败: ' + (planResult.error || '未知错误'))
+      }
+    }
+    
+    // 直接使用数据库服务保存活动
+    let result
+    if (editingActivity.value && editingActivity.value.id) {
+      // 更新现有活动
+      activityData.id = editingActivity.value.id
+      result = await supabaseService.saveActivity(activityData)
+    } else {
+      // 创建新活动
+      result = await supabaseService.saveActivity(activityData)
+    }
+    
+    if (result.success) {
+      console.log('活动保存成功')
+      // 重新加载行程数据以获取最新状态
+      await fetchPlanDetail()
+      
+      // 如果添加了新活动且不在当前天，切换到对应天数
+      if (!editingActivity.value && editForm.value.day_number !== activeDay.value) {
+        activeDay.value = editForm.value.day_number
+      }
+      closeEditModal()
+    } else {
+      throw new Error(result.error || '保存活动失败')
+    }
+    
   } catch (error) {
-    console.error('加载行程详情失败:', error)
-    message.error('加载失败，请重试')
-    router.push('/plans')
+    console.error('保存活动失败:', error)
+    alert('保存活动失败: ' + error.message)
+    // 重新加载数据以确保显示正确状态
+    await fetchPlanDetail()
+  }
+}
+
+// 删除活动
+const deleteActivity = async () => {
+  if (!editingActivity.value || !editingActivity.value.id) return
+  
+  if (confirm('确定要删除这个活动吗？')) {
+    try {
+      // 确保行程ID存在
+      if (!plan.value.id || plan.value.id === 'new') {
+        throw new Error('无法删除未保存行程中的活动')
+      }
+      
+      // 直接使用数据库服务删除活动
+      const result = await supabaseService.deleteActivity(editingActivity.value.id)
+      
+      if (result.success) {
+        console.log('活动删除成功')
+        // 重新加载行程数据以确保显示最新信息
+        await fetchPlanDetail()
+        closeEditModal()
+      } else {
+        throw new Error(result.error || '删除活动失败')
+      }
+      
+    } catch (error) {
+      console.error('删除活动失败:', error)
+      alert('删除活动失败: ' + error.message)
+      // 重新加载数据以恢复到正确状态
+      await fetchPlanDetail()
+    }
+  }
+}
+
+const formatTime = (time) => {
+  return time || '--:--'
+}
+
+const formatCurrency = (amount) => {
+  return Number(amount).toLocaleString('zh-CN')
+}
+
+// 获取默认图片
+const getDefaultImage = (activity) => {
+  // 根据活动类型或时间段返回不同颜色的占位图
+  const colorMap = {
+    morning: '%23e6f7ff', // 蓝色
+    afternoon: '%23f6ffed', // 绿色
+    evening: '%23fff7e6', // 橙色
+    night: '%23f9f0ff' // 紫色
+  };
+  const bgColor = colorMap[activity.time_slot] || '%23f0f0f0';
+  
+  return `data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" width="100%25" height="100%25" viewBox="0 0 800 400"%3e%3cdefs%3e%3cstyle type="text/css"%3e .shape %7b fill: ${bgColor}; %7d .text %7b font-family: Arial, sans-serif; font-size: 16px; fill: %23666; %7d %3c/style%3e%3c/defs%3e%3crect class="shape" width="800" height="400"/%3e%3ctext class="text" x="400" y="200" text-anchor="middle" dy=".3em"%3e${encodeURIComponent(getTimeSlotText(activity.time_slot))}活动%3c/text%3e%3c/svg%3e`;
+}
+
+const toggleDebug = () => {
+  showDebug.value = !showDebug.value
+}
+
+// 获取行程详情
+const fetchPlanDetail = async () => {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const { id } = route.params
+    console.log('尝试获取行程ID:', id)
+    
+    // 验证UUID格式
+    if (id && id !== 'new' && !supabaseService.isValidUUID?.(id)) {
+      throw new Error('无效的行程ID格式')
+    }
+    
+    if (id && id !== 'new') {
+      // 从数据库获取行程数据
+      console.log(`尝试获取行程ID: ${id} 的详情`)
+      const result = await supabaseService.getPlanDetail(id)
+      
+      if (result.success && result.data) {
+        console.log('成功从数据库获取行程:', result.data.title)
+        // 确保activities字段存在且是数组
+        const activities = Array.isArray(result.data.activities) ? result.data.activities : []
+        
+        plan.value = {
+          ...result.data,
+          activities: activities
+        }
+        activeDay.value = 1
+      } else {
+        // 数据库获取失败，尝试创建测试行程
+        console.error('数据库获取失败:', result.error || '未知错误')
+        console.log('尝试创建测试行程...')
+        
+        const testPlanResult = await supabaseService.createTestPlanWithActivities()
+        if (testPlanResult.success && testPlanResult.data) {
+          console.log('测试行程创建成功，获取新行程详情...')
+          // 获取刚创建的测试行程详情
+          const newResult = await supabaseService.getPlanDetail(testPlanResult.data.planId)
+          if (newResult.success && newResult.data) {
+            const activities = Array.isArray(newResult.data.activities) ? newResult.data.activities : []
+            plan.value = {
+              ...newResult.data,
+              activities: activities
+            }
+            activeDay.value = 1
+            console.log('成功加载测试行程')
+            return // 成功获取测试行程，直接返回
+          }
+        }
+        
+        // 如果创建测试行程也失败，才抛出错误
+        throw new Error('行程不存在且无法创建测试行程')
+      }
+    } else {
+      // 新建行程页面，显示空行程状态
+      console.log('显示空行程状态')
+      plan.value = {
+        id: 'new',
+        title: '新建行程',
+        description: '请创建您的旅行计划',
+        days: 1,
+        budget: 0,
+        travelers: 1,
+        destination: '',
+        status: 'planning',
+        activities: []
+      }
+      activeDay.value = 1
+    }
+  } catch (err) {
+    console.error('获取行程详情失败:', err)
+    error.value = '获取行程信息失败，请稍后重试'
+    // 不使用模拟数据，让用户看到真实的错误状态
   } finally {
     loading.value = false
   }
 }
 
+// 生命周期
 onMounted(() => {
-  if (route.params.id) {
-    loadPlanDetail()
-  } else {
-    message.error('行程ID不存在')
-    router.push('/plans')
-  }
+  console.log('行程详情页面加载成功')
+  console.log('路由参数:', route.params)
+  fetchPlanDetail()
 })
 </script>
 
@@ -454,25 +576,78 @@ onMounted(() => {
   margin: 0 auto;
   padding: 20px;
   min-height: calc(100vh - 80px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
+/* 返回按钮 */
+.top-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.back-button-container {
+  /* 由top-controls控制 */
+}
+
+.toggle-debug-button {
+  padding: 6px 16px;
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+
+.toggle-debug-button:hover {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+}
+
+@media (max-width: 768px) {
+  .top-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+.back-button {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+  user-select: none;
+}
+
+.back-button:active {
+  transform: translateY(1px);
+}
+
+.back-button:hover {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+/* 行程头部信息 */
 .plan-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 12px;
   padding: 30px;
   margin-bottom: 30px;
-  position: relative;
 }
 
-.back-btn {
-  color: white !important;
-  margin-bottom: 20px;
-}
-
-.header-content h1 {
+.plan-header h1 {
   font-size: 2.5rem;
-  font-weight: 700;
   margin-bottom: 16px;
   color: white;
 }
@@ -480,126 +655,484 @@ onMounted(() => {
 .plan-description {
   font-size: 1.1rem;
   opacity: 0.9;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  line-height: 1.6;
 }
 
 .plan-meta {
-  margin-bottom: 20px;
-}
-
-.plan-meta .ant-space {
-  font-size: 1rem;
-}
-
-.header-actions {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
-.itinerary-section {
+.meta-item {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+.meta-label {
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.meta-value {
+  font-weight: 700;
+}
+
+/* 活动部分 */
+.activities-section {
   background: white;
   border-radius: 12px;
   padding: 30px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.itinerary-section h2 {
+.activities-section h2 {
   font-size: 1.8rem;
-  font-weight: 600;
   margin-bottom: 24px;
   color: #1f2937;
 }
 
-.day-itinerary {
-  padding: 20px 0;
+/* 日期标签 */
+.day-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  scroll-behavior: smooth;
 }
 
-.time-dot {
-  width: 80px;
-  height: 30px;
-  border-radius: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
+.day-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.day-tabs::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.day-tabs::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.day-tabs::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.day-tab {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+  font-weight: 500;
+  user-select: none;
+}
+
+.day-tab:active {
+  transform: scale(0.95);
+}
+
+.day-tab:hover {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.day-tab.active {
+  background: #1890ff;
+  border-color: #1890ff;
   color: white;
 }
 
-.time-slot-morning {
-  background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
-}
-
-.time-slot-afternoon {
-  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-}
-
-.time-slot-evening {
-  background: linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%);
-}
-
-.time-slot-night {
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 100%);
-}
-
-.activity-card {
-  margin: 10px 0;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-
-.activity-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.activity-header h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0;
-  color: #1f2937;
-}
-
-.activity-time {
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.activity-content p {
-  color: #4b5563;
-  line-height: 1.6;
-  margin-bottom: 12px;
-}
-
-.activity-meta {
-  color: #6b7280;
-  font-size: 0.9rem;
+/* 活动列表 */
+.day-activities {
+  position: relative;
 }
 
 .no-activities {
   text-align: center;
-  padding: 60px 0;
+  padding: 60px 20px;
+  color: #8c8c8c;
+  font-size: 16px;
 }
 
-:deep(.ant-tabs-tab) {
+.activity-card {
+  display: flex;
+  margin-bottom: 24px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: fadeInUp 0.5s ease-out;
+  cursor: pointer;
+}
+
+.activity-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.activity-image-container {
+  width: 150px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.activity-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.activity-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.activity-time-badge {
+  width: 80px;
+  background: #1890ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.activity-content {
+  flex: 1;
+  padding: 20px;
+}
+
+.activity-content h3 {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.activity-desc {
+  color: #6b7280;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.activity-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.info-item {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.info-label {
   font-weight: 500;
+  margin-right: 4px;
 }
 
-:deep(.ant-timeline-item-content) {
-  margin-left: 100px;
+/* 加载状态 */
+.loading-container {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
 }
 
-:deep(.ant-timeline-item-tail) {
-  left: 40px;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
 }
 
-:deep(.ant-timeline-item-head) {
-  left: 40px;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
+/* 错误状态 */
+.error-container {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.error-message {
+  color: #ff4d4f;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.retry-button {
+  padding: 8px 24px;
+  background: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.retry-button:hover {
+  background: #40a9ff;
+}
+
+/* 调试信息 */
+.debug-info {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+}
+
+.debug-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.debug-action {
+  padding: 6px 12px;
+  background: #52c41a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+
+.debug-action:hover {
+  background: #73d13d;
+}
+
+.debug-info h3 {
+  margin-bottom: 12px;
+  color: #389e0d;
+}
+
+.debug-info p {
+  margin-bottom: 8px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.debug-toggle {
+  margin-top: 12px;
+  padding: 6px 12px;
+  background: #52c41a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.debug-toggle:hover {
+  background: #73d13d;
+}
+
+/* 编辑弹窗样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #1f2937;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.modal-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modal-footer {
+  padding: 20px 24px;
+  border-top: 1px solid #e8e8e8;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-cancel:hover {
+  background: #e6e6e6;
+  border-color: #bfbfbf;
+}
+
+.btn-save {
+  padding: 10px 20px;
+  background: #1890ff;
+  border: 1px solid #1890ff;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-save:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.btn-delete {
+  padding: 10px 20px;
+  background: #ff4d4f;
+  border: 1px solid #ff4d4f;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-delete:hover {
+  background: #ff7875;
+  border-color: #ff7875;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
   .plan-detail {
     padding: 16px;
@@ -609,26 +1142,60 @@ onMounted(() => {
     padding: 20px;
   }
   
-  .header-content h1 {
+  .plan-header h1 {
     font-size: 2rem;
   }
   
-  .activity-header {
+  .plan-meta {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    gap: 12px;
   }
   
-  :deep(.ant-timeline-item-content) {
-    margin-left: 60px;
+  .activities-section {
+    padding: 20px;
   }
   
-  :deep(.ant-timeline-item-tail) {
-    left: 30px;
+  .activity-card {
+    flex-direction: column;
   }
   
-  :deep(.ant-timeline-item-head) {
-    left: 30px;
+  .activity-time-badge {
+    width: 100%;
+    padding: 8px 0;
+  }
+  
+  .activity-image-container {
+    width: 100%;
+    height: 180px;
+  }
+  
+  .day-tabs {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .back-button {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .modal-content {
+    max-width: 100%;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-footer button {
+    width: 100%;
   }
 }
 </style>

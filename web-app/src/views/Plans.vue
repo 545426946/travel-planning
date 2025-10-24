@@ -46,10 +46,6 @@
             </div>
             
             <template #actions>
-              <a-button type="link" @click="editPlan(item)">
-                <template #icon><EditOutlined /></template>
-                编辑
-              </a-button>
               <a-button type="link" @click="viewPlan(item)">
                 <template #icon><EyeOutlined /></template>
                 查看
@@ -146,7 +142,6 @@ import {
   CalendarOutlined, 
   DollarOutlined, 
   UserOutlined,
-  EditOutlined,
   EyeOutlined,
   DeleteOutlined
 } from '@ant-design/icons-vue'
@@ -175,48 +170,39 @@ const createRules = {
   budget: [{ required: true, message: '请输入预算', trigger: 'blur' }]
 }
 
-const plans = ref([
-  {
-    id: 1,
-    title: '北京文化之旅',
-    description: '探索故宫、长城等历史文化景点',
-    icon: '🏯',
-    days: 3,
-    budget: 2500,
-    travelers: 2,
-    status: 'planning'
-  },
-  {
-    id: 2,
-    title: '上海现代游',
-    description: '体验上海的现代化都市魅力',
-    icon: '🏙️',
-    days: 2,
-    budget: 1800,
-    travelers: 1,
-    status: 'completed'
-  }
-])
+const plans = ref([])
 
 const handleCreatePlan = async () => {
   try {
     await createFormRef.value.validate()
     creating.value = true
     
-    // 模拟创建行程
-    const newPlan = {
-      id: Date.now(),
-      ...createForm.value,
-      icon: '✈️',
-      status: 'planning'
+    // 保存行程到数据库
+    const planData = {
+      title: createForm.value.title,
+      description: createForm.value.description,
+      days: parseInt(createForm.value.days),
+      budget: parseFloat(createForm.value.budget),
+      travelers: parseInt(createForm.value.travelers),
+      destination: createForm.value.destination,
+      status: 'planning',
+      is_ai_generated: false
     }
     
-    plans.value.unshift(newPlan)
-    message.success('行程创建成功')
-    showCreateModal.value = false
-    resetCreateForm()
+    const result = await supabaseService.savePlan(planData)
+    
+    if (result.success) {
+      message.success('行程创建成功')
+      showCreateModal.value = false
+      resetCreateForm()
+      // 重新加载行程列表
+      loadPlans()
+    } else {
+      throw new Error(result.error || '保存行程失败')
+    }
   } catch (error) {
     console.error('创建行程失败:', error)
+    message.error('创建行程失败，请重试')
   } finally {
     creating.value = false
   }
@@ -242,10 +228,6 @@ const handlePlanSaved = (plan) => {
   // 重新加载行程列表
   loadPlans()
   message.success('AI行程已保存到数据库')
-}
-
-const editPlan = (plan) => {
-  message.info(`编辑行程: ${plan.title}`)
 }
 
 const viewPlan = (plan) => {

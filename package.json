@@ -4,11 +4,13 @@
   "description": "轻量旅行规划网页版应用",
   "main": "web-app/index.html",
   "scripts": {
-    "dev": "cd web-app && node start-server.js",
-    "serve": "cd web-app && npx serve .",
-    "start": "cd web-app && python -m http.server 8000",
-    "build": "echo '静态网页应用，无需构建'",
-    "deploy": "echo '请配置部署脚本'"
+    "dev": "cd web-app && npm install && npm run dev",
+    "serve": "cd web-app && npm install && npm run serve",
+    "start": "cd web-app && npm install && npm run start",
+    "build": "cd web-app && npm install && npm run build",
+    "preview": "cd web-app && npm install && npm run preview",
+    "deploy": "echo '请配置部署脚本'",
+    "quick-start": "powershell -ExecutionPolicy Bypass -File start.ps1"
   },
   "keywords": [
     "travel",
@@ -20,7 +22,7 @@
   "author": "轻量旅行规划团队",
   "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.76.0"
+    "@supabase/supabase-js": "^2.76.1"
   },
   "devDependencies": {
     "serve": "^14.0.0"

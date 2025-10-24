@@ -175,9 +175,12 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import mistralService from '../services/mistralService'
 import supabaseService from '../services/supabaseService'
+
+const router = useRouter()
 
 const emit = defineEmits(['plan-saved'])
 
@@ -231,63 +234,126 @@ const handleCancel = () => {
   aiFormRef.value.resetFields()
 }
 
+// 保存AI生成的行程
 const saveAIPlan = async () => {
   try {
-    // 保存行程基本信息到数据库
-    const saveResult = await supabaseService.savePlan({
-      title: aiPlanResult.value.title,
-      description: aiPlanResult.value.description,
-      days: aiPlanResult.value.days,
-      budget: aiPlanResult.value.budget,
-      travelers: aiForm.value.travelers,
+    if (!aiPlanResult.value) {
+      message.error('没有可保存的行程')
+      return
+    }
+    
+    const saving = ref(true)
+    
+    // 准备保存数据
+    const planData = {
+      title: aiPlanResult.value.title || `${aiForm.value.destination}${aiForm.value.days}日游`,
+      description: `AI生成的${aiForm.value.destination}旅行计划`,
       destination: aiForm.value.destination,
-      itinerary: aiPlanResult.value.itinerary,
-      tips: aiPlanResult.value.tips,
-      is_ai_generated: true
-    })
-
-    if (saveResult.success) {
-      // 保存详细的行程活动数据
-      const activities = []
-      aiPlanResult.value.itinerary.forEach(day => {
+      days: parseInt(aiForm.value.days),
+      budget: parseFloat(aiForm.value.budget),
+      travelers: parseInt(aiForm.value.travelers),
+      status: 'planning',
+      is_ai_generated: true,
+      created_by_ai: true
+    }
+    
+    // 保存行程基本信息到数据库
+    const result = await supabaseService.savePlan(planData)
+    
+    if (!result.success) {
+      throw new Error(result.error || '保存行程失败')
+    }
+    
+    const savedPlan = result.data
+    
+    // 转换活动数据格式
+    const activities = []
+    if (aiPlanResult.value.itinerary && Array.isArray(aiPlanResult.value.itinerary)) {
+      aiPlanResult.value.itinerary.forEach((day, dayIndex) => {
         if (day.activities && Array.isArray(day.activities)) {
-          day.activities.forEach(activity => {
+          day.activities.forEach((activity, activityIndex) => {
+            // 简单活动格式转换
+            const timeSlotMap = {
+              '早上': 'morning',
+              '上午': 'morning',
+              '下午': 'afternoon',
+              '晚上': 'evening'
+            }
+            
+            // 从活动文本中提取信息
+            const activityTitle = typeof activity === 'string' ? activity : activity.name || '活动'
+            const activityDesc = typeof activity === 'object' ? (activity.description || '') : ''
+            
+            // 生成合理的时间安排
+            const timeSlots = ['09:00', '11:00', '14:00', '16:00', '19:00']
+            const startTime = timeSlots[activityIndex % timeSlots.length]
+            const endTime = timeSlots[(activityIndex + 1) % timeSlots.length]
+            
             activities.push({
-              day_number: day.day,
-              time_slot: activity.time_slot,
-              activity_title: activity.activity_title,
-              activity_description: activity.activity_description,
-              location: activity.location,
-              estimated_cost: activity.estimated_cost,
-              duration_minutes: activity.duration_minutes,
-              start_time: activity.start_time,
-              end_time: activity.end_time,
-              order_index: activity.order_index || 0
+              plan_id: savedPlan.id,
+              day_number: dayIndex + 1,
+              order_index: activityIndex,
+              activity_title: activityTitle,
+              activity_description: activityDesc || `第${dayIndex + 1}天的第${activityIndex + 1}个活动`,
+              location: typeof activity === 'object' ? (activity.location || '') : aiForm.value.destination,
+              time_slot: ['morning', 'afternoon', 'evening'][activityIndex % 3],
+              start_time: startTime,
+              end_time: endTime,
+              duration_minutes: 120,
+              estimated_cost: Math.floor(Math.random() * 200) + 50
             })
           })
         }
       })
-
-      if (activities.length > 0) {
-        await supabaseService.savePlanActivities(saveResult.data.id, activities)
-      }
-
-      message.success('AI行程已成功保存到数据库')
-      // 触发父组件更新
-      emit('plan-saved', saveResult.data)
-      showResultModal.value = false
-    } else {
-      message.error('保存失败：' + saveResult.error)
     }
+    
+    // 保存活动到数据库
+    await supabaseService.savePlanActivities(savedPlan.id, activities)
+    
+    message.success('行程保存成功')
+    showResultModal.value = false
+    
+    // 跳转到行程详情页
+    router.push(`/plan/${savedPlan.id}`)
   } catch (error) {
-    console.error('保存AI行程失败:', error)
-    message.error('保存失败，请重试')
+    console.error('保存行程失败:', error)
+    message.error('保存行程失败，请重试')
   }
 }
 
 const regeneratePlan = async () => {
   showResultModal.value = false
   showAIModal.value = true
+}
+
+// 获取时间段函数（根据活动索引）
+const getTimeSlotByIndex = (index) => {
+  const slots = ['morning', 'afternoon', 'evening']
+  return slots[index % slots.length]
+}
+
+// 计算总天数
+const calculateTotalDays = (startDate, endDate) => {
+  if (!startDate || !endDate) return 1;
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end - start);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  return diffDays > 0 ? diffDays : 1;
+};
+
+// 计算总预算
+const calculateTotalBudget = (dailyBudget, days) => {
+  if (!dailyBudget || !days) return 0;
+  return parseFloat(dailyBudget) * parseInt(days);
+};
+
+// 计算日均预算
+const calculateDailyBudget = (totalBudget, days) => {
+  if (!totalBudget || !days || parseInt(days) === 0) return 0;
+  return parseFloat(totalBudget) / parseInt(days);
 }
 </script>
 

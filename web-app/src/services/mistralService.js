@@ -318,7 +318,7 @@ class MistralAIService {
   }
 
   // 模拟Mistral AI响应（用于演示）
-  getMockResponse(prompt) {
+  getMockResponse() {
     return `**北京3日文化深度游**
 
 **行程概览：**

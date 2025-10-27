@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行程测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .day-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+        }
+        .activity {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #fff;
+            border-left: 3px solid #4CAF50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .activity-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .activity-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .log {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <h1>行程测试页面</h1>
+    
+    <div class="container">
+        <h2>行程信息</h2>
+        <div id="plan-info">
+            <p>正在加载行程...</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>行程活动</h2>
+        <div id="activities-container">
+            <p>正在加载活动...</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>调试日志</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        // 简单的UUID验证函数
+        function isValidUUID(id) {
+            if (!id || typeof id !== 'string') return false;
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            return uuidRegex.test(id);
+        }
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = message;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        // 模拟行程数据
+        const mockPlan = {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            title: '模拟测试行程',
+            description: '这是一个模拟行程，用于测试活动显示功能',
+            days: 2,
+            budget: 1000,
+            travelers: 2,
+            destination: '测试城市',
+            status: 'planning',
+            activities: [
+                {
+                    id: 'activity-1',
+                    activity_title: '上午参观博物馆',
+                    activity_description: '参观当地著名博物馆，了解当地历史文化',
+                    day_number: 1,
+                    time_slot: 'morning',
+                    location: '市中心博物馆',
+                    estimated_cost: 100,
+                    duration_minutes: 120,
+                    start_time: '09:00',
+                    end_time: '11:00',
+                    order_index: 0
+                },
+                {
+                    id: 'activity-2',
+                    activity_title: '中午餐厅午餐',
+                    activity_description: '品尝当地特色美食',
+                    day_number: 1,
+                    time_slot: 'noon',
+                    location: '老城区餐厅',
+                    estimated_cost: 150,
+                    duration_minutes: 60,
+                    start_time: '12:00',
+                    end_time: '13:00',
+                    order_index: 1
+                },
+                {
+                    id: 'activity-3',
+                    activity_title: '下午购物',
+                    activity_description: '在商业区购物，购买纪念品',
+                    day_number: 1,
+                    time_slot: 'afternoon',
+                    location: '购物广场',
+                    estimated_cost: 200,
+                    duration_minutes: 180,
+                    start_time: '14:00',
+                    end_time: '17:00',
+                    order_index: 2
+                },
+                {
+                    id: 'activity-4',
+                    activity_title: '第二天观光',
+                    activity_description: '城市观光一日游，欣赏城市风光',
+                    day_number: 2,
+                    time_slot: 'general',
+                    location: '城市各处',
+                    estimated_cost: 300,
+                    duration_minutes: 240,
+                    start_time: '09:00',
+                    end_time: '13:00',
+                    order_index: 0
+                }
+            ]
+        };
+        
+        // 按天整理活动
+        function organizeActivitiesByDay(activities) {
+            const organized = {};
+            
+            activities.forEach(activity => {
+                const day = activity.day_number || 1;
+                if (!organized[day]) {
+                    organized[day] = [];
+                }
+                organized[day].push(activity);
+            });
+            
+            // 对每天的活动按order_index排序
+            Object.keys(organized).forEach(day => {
+                organized[day].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+            });
+            
+            return organized;
+        }
+        
+        // 显示行程信息
+        function displayPlanInfo(plan) {
+            const planInfoDiv = document.getElementById('plan-info');
+            planInfoDiv.innerHTML = `
+                <p><strong>行程标题:</strong> ${plan.title}</p>
+                <p><strong>行程描述:</strong> ${plan.description}</p>
+                <p><strong>目的地:</strong> ${plan.destination}</p>
+                <p><strong>天数:</strong> ${plan.days} 天</p>
+                <p><strong>预算:</strong> ${plan.budget} 元</p>
+                <p><strong>旅行者数量:</strong> ${plan.travelers} 人</p>
+                <p><strong>状态:</strong> ${plan.status}</p>
+            `;
+        }
+        
+        // 显示活动
+        function displayActivities(organizedActivities) {
+            const container = document.getElementById('activities-container');
+            container.innerHTML = '';
+            
+            // 按天数排序
+            const days = Object.keys(organizedActivities).sort((a, b) => parseInt(a) - parseInt(b));
+            
+            if (days.length === 0) {
+                container.innerHTML = '<p>没有找到活动</p>';
+                return;
+            }
+            
+            days.forEach(day => {
+                const daySection = document.createElement('div');
+                daySection.className = 'day-section';
+                daySection.innerHTML = `<h3>第 ${day} 天</h3>`;
+                
+                organizedActivities[day].forEach(activity => {
+                    const activityDiv = document.createElement('div');
+                    activityDiv.className = 'activity';
+                    activityDiv.innerHTML = `
+                        <div class="activity-title">${activity.activity_title}</div>
+                        <div class="activity-time">${activity.start_time} - ${activity.end_time}</div>
+                        <div>${activity.activity_description}</div>
+                        <div>地点: ${activity.location}</div>
+                        <div>费用: ${activity.estimated_cost} 元</div>
+                        <div>时长: ${activity.duration_minutes} 分钟</div>
+                    `;
+                    daySection.appendChild(activityDiv);
+                });
+                
+                container.appendChild(daySection);
+            });
+        }
+        
+        // 测试UUID功能
+        function testUuid() {
+            log('===== 开始测试UUID验证 =====', 'success');
+            
+            const testIds = ['1', '123e4567-e89b-12d3-a456-426614174000', null, undefined];
+            
+            testIds.forEach(id => {
+                const isValid = isValidUUID(id);
+                log(`"${id}" 是有效的UUID吗？ ${isValid}`, isValid ? 'success' : 'warning');
+            });
+            
+            return mockPlan.id; // 返回有效的测试行程ID
+        }
+        
+        // 主函数
+        async function main() {
+            try {
+                log('开始加载行程数据...', 'success');
+                
+                // 测试UUID
+                const validPlanId = testUuid();
+                log(`使用有效的行程ID: ${validPlanId}`, 'success');
+                
+                // 显示行程信息
+                displayPlanInfo(mockPlan);
+                log('行程信息显示成功', 'success');
+                
+                // 整理并显示活动
+                const organizedActivities = organizeActivitiesByDay(mockPlan.activities);
+                log(`活动整理完成，共 ${Object.keys(organizedActivities).length} 天`, 'success');
+                displayActivities(organizedActivities);
+                log('活动显示成功', 'success');
+                
+                // 显示详细的活动数据
+                log('\n活动数据详情:', 'info');
+                mockPlan.activities.forEach((activity, index) => {
+                    log(`活动${index + 1}: ${activity.activity_title} (第${activity.day_number}天)`, 'info');
+                });
+                
+            } catch (error) {
+                log('发生错误: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        // 页面加载后运行
+        window.onload = main;
+    </script>
+</body>
+</html>

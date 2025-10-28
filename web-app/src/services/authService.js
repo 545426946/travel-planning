@@ -334,6 +334,13 @@ class AuthService {
     // 通知状态变化
     this.notifyListeners()
     
+    // 触发登出跳转事件
+    window.dispatchEvent(new CustomEvent('userLogout', {
+      detail: {
+        redirectTo: '/'
+      }
+    }))
+    
     message.success('已成功登出')
   }
 

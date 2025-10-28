@@ -272,42 +272,48 @@ const saveAIPlan = async () => {
     
     const savedPlan = result.data
     
-    // 转换活动数据格式
+    // 转换活动数据格式（支持新的JSON格式）
     const activities = []
     if (aiPlanResult.value.itinerary && Array.isArray(aiPlanResult.value.itinerary)) {
       aiPlanResult.value.itinerary.forEach((day, dayIndex) => {
         if (day.activities && Array.isArray(day.activities)) {
           day.activities.forEach((activity, activityIndex) => {
-            // 简单活动格式转换
-            const timeSlotMap = {
-              '早上': 'morning',
-              '上午': 'morning',
-              '下午': 'afternoon',
-              '晚上': 'evening'
+            // 处理新的JSON格式活动数据
+            const activityData = {
+              plan_id: savedPlan.id,
+              day_number: day.day || dayIndex + 1,
+              order_index: activityIndex,
+              activity_title: activity.activity_title || activity.name || '活动',
+              activity_description: activity.activity_description || activity.description || `第${dayIndex + 1}天的第${activityIndex + 1}个活动`,
+              location: activity.location || aiForm.value.destination,
+              time_slot: activity.time_slot || ['morning', 'afternoon', 'evening'][activityIndex % 3],
+              start_time: activity.start_time || '09:00',
+              end_time: activity.end_time || '12:00',
+              duration_minutes: activity.duration_minutes || 180,
+              estimated_cost: activity.estimated_cost || Math.floor(Math.random() * 200) + 50,
+              transportation: activity.transportation || '步行/公共交通',
+              travel_time: activity.travel_time || '30分钟'
             }
             
-            // 从活动文本中提取信息
-            const activityTitle = typeof activity === 'string' ? activity : activity.name || '活动'
-            const activityDesc = typeof activity === 'object' ? (activity.description || '') : ''
+            // 验证并修正时间数据
+            if (!activityData.start_time || !activityData.end_time) {
+              // 生成合理的时间安排
+              const timeSlots = ['08:00', '10:00', '13:00', '15:00', '18:00', '20:00']
+              activityData.start_time = timeSlots[activityIndex % timeSlots.length]
+              activityData.end_time = timeSlots[(activityIndex + 1) % timeSlots.length]
+            }
             
-            // 生成合理的时间安排
-            const timeSlots = ['09:00', '11:00', '14:00', '16:00', '19:00']
-            const startTime = timeSlots[activityIndex % timeSlots.length]
-            const endTime = timeSlots[(activityIndex + 1) % timeSlots.length]
+            // 根据时间段设置合理的持续时间
+            if (!activityData.duration_minutes) {
+              switch (activityData.time_slot) {
+                case 'morning': activityData.duration_minutes = 180; break
+                case 'afternoon': activityData.duration_minutes = 240; break
+                case 'evening': activityData.duration_minutes = 120; break
+                default: activityData.duration_minutes = 180
+              }
+            }
             
-            activities.push({
-              plan_id: savedPlan.id,
-              day_number: dayIndex + 1,
-              order_index: activityIndex,
-              activity_title: activityTitle,
-              activity_description: activityDesc || `第${dayIndex + 1}天的第${activityIndex + 1}个活动`,
-              location: typeof activity === 'object' ? (activity.location || '') : aiForm.value.destination,
-              time_slot: ['morning', 'afternoon', 'evening'][activityIndex % 3],
-              start_time: startTime,
-              end_time: endTime,
-              duration_minutes: 120,
-              estimated_cost: Math.floor(Math.random() * 200) + 50
-            })
+            activities.push(activityData)
           })
         }
       })

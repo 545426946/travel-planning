@@ -59,12 +59,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { message } from 'ant-design-vue'
 import AuthModal from './components/AuthModal.vue'
-import authService from './services/authService'
+import { useAuthStore, cleanupAuthStore } from './stores/authStore'
 
 const router = useRouter()
 const route = useRoute()
@@ -73,11 +73,8 @@ const currentRoute = computed(() => [route.path])
 const showAuthModal = ref(false)
 const authModalMode = ref('login')
 
-// 响应式状态管理
-const authState = reactive({
-  isLoggedIn: authService.isLoggedIn(),
-  currentUser: authService.getCurrentUser()
-})
+// 使用状态管理store
+const { authState, logout } = useAuthStore()
 
 // 计算属性
 const isLoggedIn = computed(() => authState.isLoggedIn)
@@ -93,48 +90,33 @@ const openAuthModal = (mode = 'login') => {
 }
 
 const handleAuthSuccess = () => {
-  // 更新认证状态
-  authState.isLoggedIn = authService.isLoggedIn()
-  authState.currentUser = authService.getCurrentUser()
   showAuthModal.value = false
 }
 
-const logout = () => {
-  authService.logout()
-  // 更新认证状态
-  authState.isLoggedIn = false
-  authState.currentUser = null
-  message.success('已退出登录')
-}
-
-// 监听认证状态变化
-const handleAuthStateChange = () => {
-  authState.isLoggedIn = authService.isLoggedIn()
-  authState.currentUser = authService.getCurrentUser()
+// 登出跳转监听器
+const handleRedirectToHome = () => {
+  if (router.currentRoute.value.path !== '/') {
+    router.push('/')
+  }
 }
 
 onMounted(() => {
-  // 初始化认证状态
-  authState.isLoggedIn = authService.isLoggedIn()
-  authState.currentUser = authService.getCurrentUser()
-  
-  // 添加认证状态变化监听器
-  window.addEventListener('authStateChange', handleAuthStateChange)
-  
   // 监听来自子组件的打开登录模态框事件
   window.addEventListener('openAuthModal', (event) => {
     openAuthModal(event.detail.mode || 'login')
   })
   
-  // 添加authService的监听器
-  authService.addListener(handleAuthStateChange)
+  // 监听登出跳转事件
+  window.addEventListener('redirectToHome', handleRedirectToHome)
 })
 
 // 组件卸载时移除监听器
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
-  window.removeEventListener('authStateChange', handleAuthStateChange)
-  authService.removeListener(handleAuthStateChange)
+  window.removeEventListener('openAuthModal', (event) => {
+    openAuthModal(event.detail.mode || 'login')
+  })
+  window.removeEventListener('redirectToHome', handleRedirectToHome)
+  cleanupAuthStore()
 })
 </script>
 

@@ -21,16 +21,16 @@
             </a-menu>
             <div class="auth-buttons">
               <a-button 
-                v-if="!user" 
+                v-if="!isLoggedIn" 
                 type="primary" 
-                @click="showLoginModal = true"
+                @click="openAuthModal('login')"
               >
                 登录/注册
               </a-button>
               <a-dropdown v-else>
                 <a-space>
-                  <a-avatar :src="user.avatar" />
-                  <span>{{ user.username }}</span>
+                  <a-avatar>{{ currentUser?.username?.charAt(0)?.toUpperCase() || 'U' }}</a-avatar>
+                  <span>{{ currentUser?.displayName || currentUser?.username }}</span>
                 </a-space>
                 <template #overlay>
                   <a-menu>
@@ -48,129 +48,93 @@
         </a-layout-content>
       </a-layout>
 
-      <!-- 登录模态框 -->
-      <a-modal
-        v-model:open="showLoginModal"
-        title="登录/注册"
-        :footer="null"
-        width="400px"
-      >
-        <a-tabs v-model:activeKey="activeTab">
-          <a-tab-pane key="login" tab="登录">
-            <a-form
-              :model="loginForm"
-              @finish="handleLogin"
-              layout="vertical"
-            >
-              <a-form-item label="邮箱地址" name="email">
-                <a-input v-model:value="loginForm.email" />
-              </a-form-item>
-              <a-form-item label="密码" name="password">
-                <a-input-password v-model:value="loginForm.password" />
-              </a-form-item>
-              <a-form-item>
-                <a-button type="primary" html-type="submit" block>
-                  登录
-                </a-button>
-              </a-form-item>
-            </a-form>
-          </a-tab-pane>
-          
-          <a-tab-pane key="register" tab="注册">
-            <a-form
-              :model="registerForm"
-              @finish="handleRegister"
-              layout="vertical"
-            >
-              <a-form-item label="用户名" name="username">
-                <a-input v-model:value="registerForm.username" />
-              </a-form-item>
-              <a-form-item label="邮箱地址" name="email">
-                <a-input v-model:value="registerForm.email" />
-              </a-form-item>
-              <a-form-item label="密码" name="password">
-                <a-input-password v-model:value="registerForm.password" />
-              </a-form-item>
-              <a-form-item>
-                <a-button type="primary" html-type="submit" block>
-                  注册
-                </a-button>
-              </a-form-item>
-            </a-form>
-          </a-tab-pane>
-        </a-tabs>
-      </a-modal>
+      <!-- 登录注册模态框 -->
+      <AuthModal 
+        v-model:visible="showAuthModal" 
+        :default-mode="authModalMode"
+        @success="handleAuthSuccess"
+      />
     </div>
   </a-config-provider>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { message } from 'ant-design-vue'
+import AuthModal from './components/AuthModal.vue'
+import authService from './services/authService'
 
 const router = useRouter()
 const route = useRoute()
 
 const currentRoute = computed(() => [route.path])
-const showLoginModal = ref(false)
-const activeTab = ref('login')
-const user = ref(null)
+const showAuthModal = ref(false)
+const authModalMode = ref('login')
 
-const loginForm = ref({
-  email: '',
-  password: ''
+// 响应式状态管理
+const authState = reactive({
+  isLoggedIn: authService.isLoggedIn(),
+  currentUser: authService.getCurrentUser()
 })
 
-const registerForm = ref({
-  username: '',
-  email: '',
-  password: ''
-})
+// 计算属性
+const isLoggedIn = computed(() => authState.isLoggedIn)
+const currentUser = computed(() => authState.currentUser)
 
 const handleMenuClick = ({ key }) => {
   router.push(key)
 }
 
-const handleLogin = async () => {
-  try {
-    // 模拟登录成功
-    user.value = {
-      username: '用户',
-      email: loginForm.value.email,
-      avatar: null
-    }
-    showLoginModal.value = false
-    message.success('登录成功')
-  } catch (error) {
-    message.error('登录失败')
-  }
+const openAuthModal = (mode = 'login') => {
+  authModalMode.value = mode
+  showAuthModal.value = true
 }
 
-const handleRegister = async () => {
-  try {
-    // 模拟注册成功
-    user.value = {
-      username: registerForm.value.username,
-      email: registerForm.value.email,
-      avatar: null
-    }
-    showLoginModal.value = false
-    message.success('注册成功')
-  } catch (error) {
-    message.error('注册失败')
-  }
+const handleAuthSuccess = () => {
+  // 更新认证状态
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+  showAuthModal.value = false
 }
 
 const logout = () => {
-  user.value = null
+  authService.logout()
+  // 更新认证状态
+  authState.isLoggedIn = false
+  authState.currentUser = null
   message.success('已退出登录')
 }
 
+// 监听认证状态变化
+const handleAuthStateChange = () => {
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+}
+
 onMounted(() => {
-  // 检查用户登录状态
-  // 这里可以添加实际的登录状态检查逻辑
+  // 初始化认证状态
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+  
+  // 添加认证状态变化监听器
+  window.addEventListener('authStateChange', handleAuthStateChange)
+  
+  // 监听来自子组件的打开登录模态框事件
+  window.addEventListener('openAuthModal', (event) => {
+    openAuthModal(event.detail.mode || 'login')
+  })
+  
+  // 添加authService的监听器
+  authService.addListener(handleAuthStateChange)
+})
+
+// 组件卸载时移除监听器
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  window.removeEventListener('authStateChange', handleAuthStateChange)
+  authService.removeListener(handleAuthStateChange)
 })
 </script>
 

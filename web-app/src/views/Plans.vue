@@ -146,7 +146,8 @@ import {
   DeleteOutlined
 } from '@ant-design/icons-vue'
 import AIPlanGenerator from '../components/AIPlanGenerator.vue'
-import supabaseService from '../services/supabaseService'
+import supabaseAuthService from '../services/supabaseAuthService'
+import authService from '../services/authService'
 
 const router = useRouter()
 
@@ -170,39 +171,64 @@ const createRules = {
   budget: [{ required: true, message: '请输入预算', trigger: 'blur' }]
 }
 
-const plans = ref([])
+const plans = ref([
+  {
+    id: 1,
+    title: '北京文化之旅',
+    description: '探索故宫、长城等历史文化景点',
+    icon: '🏯',
+    days: 3,
+    budget: 2500,
+    travelers: 2,
+    status: 'planning'
+  },
+  {
+    id: 2,
+    title: '上海现代游',
+    description: '体验上海的现代化都市魅力',
+    icon: '🏙️',
+    days: 2,
+    budget: 1800,
+    travelers: 1,
+    status: 'completed'
+  }
+])
 
 const handleCreatePlan = async () => {
   try {
     await createFormRef.value.validate()
     creating.value = true
     
-    // 保存行程到数据库
-    const planData = {
+    // 检查用户是否已登录
+    if (!authService.isLoggedIn()) {
+      message.error('请先登录后再创建行程')
+      return
+    }
+    
+    // 保存到用户专属数据库
+    const result = await supabaseAuthService.saveUserPlan({
       title: createForm.value.title,
       description: createForm.value.description,
-      days: parseInt(createForm.value.days),
-      budget: parseFloat(createForm.value.budget),
-      travelers: parseInt(createForm.value.travelers),
+      days: createForm.value.days,
+      budget: createForm.value.budget,
+      travelers: createForm.value.travelers,
       destination: createForm.value.destination,
       status: 'planning',
       is_ai_generated: false
-    }
-    
-    const result = await supabaseService.savePlan(planData)
+    })
     
     if (result.success) {
       message.success('行程创建成功')
       showCreateModal.value = false
       resetCreateForm()
-      // 重新加载行程列表
+      // 重新加载用户行程列表
       loadPlans()
     } else {
-      throw new Error(result.error || '保存行程失败')
+      message.error('创建失败：' + result.error)
     }
   } catch (error) {
     console.error('创建行程失败:', error)
-    message.error('创建行程失败，请重试')
+    message.error('创建失败，请重试')
   } finally {
     creating.value = false
   }
@@ -236,7 +262,7 @@ const viewPlan = (plan) => {
 
 const deletePlan = async (plan) => {
   try {
-    const result = await supabaseService.deletePlan(plan.id)
+    const result = await supabaseAuthService.deleteUserPlan(plan.id)
     if (result.success) {
       plans.value = plans.value.filter(p => p.id !== plan.id)
       message.success('行程已删除')
@@ -249,11 +275,18 @@ const deletePlan = async (plan) => {
   }
 }
 
-// 从数据库加载行程数据
+// 从数据库加载用户专属行程数据
 const loadPlans = async () => {
   loading.value = true
   try {
-    const result = await supabaseService.getPlans()
+    // 检查用户是否已登录
+    if (!authService.isLoggedIn()) {
+      // 用户未登录，显示空列表
+      plans.value = []
+      return
+    }
+    
+    const result = await supabaseAuthService.getUserPlans()
     if (result.success) {
       plans.value = result.data.map(plan => ({
         ...plan,

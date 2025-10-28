@@ -178,7 +178,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import mistralService from '../services/mistralService'
-import supabaseService from '../services/supabaseService'
+import supabaseAuthService from '../services/supabaseAuthService'
+import authService from '../services/authService'
 
 const router = useRouter()
 
@@ -257,8 +258,13 @@ const saveAIPlan = async () => {
       created_by_ai: true
     }
     
-    // 保存行程基本信息到数据库
-    const result = await supabaseService.savePlan(planData)
+    // 检查用户是否已登录
+    if (!authService.isLoggedIn()) {
+      throw new Error('请先登录后再保存行程')
+    }
+    
+    // 保存行程基本信息到用户专属数据库
+    const result = await supabaseAuthService.saveUserPlan(planData)
     
     if (!result.success) {
       throw new Error(result.error || '保存行程失败')
@@ -307,8 +313,8 @@ const saveAIPlan = async () => {
       })
     }
     
-    // 保存活动到数据库
-    await supabaseService.savePlanActivities(savedPlan.id, activities)
+    // 保存活动到用户专属数据库
+    await supabaseAuthService.saveUserPlanActivities(savedPlan.id, activities)
     
     message.success('行程保存成功')
     showResultModal.value = false

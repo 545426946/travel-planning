@@ -197,7 +197,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import supabaseService from '../services/supabaseService'
+import supabaseAuthService from '../services/supabaseAuthService'
+import authService from '../services/authService'
 
 
 const route = useRoute()
@@ -372,8 +373,13 @@ const saveActivity = async () => {
     
     // 确保行程ID存在
     if (!plan.value.id || plan.value.id === 'new') {
-      // 如果是新建行程，先保存行程基础信息
-      const planResult = await supabaseService.savePlan({
+      // 检查用户是否已登录
+      if (!authService.isLoggedIn()) {
+        throw new Error('请先登录后再创建行程')
+      }
+      
+      // 如果是新建行程，先保存行程基础信息到用户专属数据库
+      const planResult = await supabaseAuthService.saveUserPlan({
         title: plan.value.title || '未命名行程',
         description: plan.value.description || '',
         days: plan.value.days || 1,
@@ -392,15 +398,15 @@ const saveActivity = async () => {
       }
     }
     
-    // 直接使用数据库服务保存活动
+    // 直接使用用户专属数据库服务保存活动
     let result
     if (editingActivity.value && editingActivity.value.id) {
       // 更新现有活动
       activityData.id = editingActivity.value.id
-      result = await supabaseService.saveActivity(activityData)
+      result = await supabaseAuthService.saveUserPlanActivities(plan.value.id, [activityData])
     } else {
       // 创建新活动
-      result = await supabaseService.saveActivity(activityData)
+      result = await supabaseAuthService.saveUserPlanActivities(plan.value.id, [activityData])
     }
     
     if (result.success) {
@@ -436,8 +442,12 @@ const deleteActivity = async () => {
         throw new Error('无法删除未保存行程中的活动')
       }
       
-      // 直接使用数据库服务删除活动
-      const result = await supabaseService.deleteActivity(editingActivity.value.id)
+      // 删除活动：先获取所有活动，过滤掉要删除的，然后重新保存
+      const currentActivities = plan.value.activities || []
+      const filteredActivities = currentActivities.filter(activity => activity.id !== editingActivity.value.id)
+      
+      // 重新保存过滤后的活动列表
+      const result = await supabaseAuthService.saveUserPlanActivities(plan.value.id, filteredActivities)
       
       if (result.success) {
         console.log('活动删除成功')
@@ -493,14 +503,19 @@ const fetchPlanDetail = async () => {
     console.log('尝试获取行程ID:', id)
     
     // 验证UUID格式
-    if (id && id !== 'new' && !supabaseService.isValidUUID?.(id)) {
+    if (id && id !== 'new' && !supabaseAuthService.isValidUUID?.(id)) {
       throw new Error('无效的行程ID格式')
     }
     
     if (id && id !== 'new') {
-      // 从数据库获取行程数据
-      console.log(`尝试获取行程ID: ${id} 的详情`)
-      const result = await supabaseService.getPlanDetail(id)
+      // 检查用户是否已登录
+      if (!authService.isLoggedIn()) {
+        throw new Error('请先登录后再查看行程详情')
+      }
+      
+      // 从用户专属数据库获取行程数据
+      console.log(`尝试获取用户专属行程ID: ${id} 的详情`)
+      const result = await supabaseAuthService.getUserPlanDetail(id)
       
       if (result.success && result.data) {
         console.log('成功从数据库获取行程:', result.data.title)
@@ -513,29 +528,9 @@ const fetchPlanDetail = async () => {
         }
         activeDay.value = 1
       } else {
-        // 数据库获取失败，尝试创建测试行程
-        console.error('数据库获取失败:', result.error || '未知错误')
-        console.log('尝试创建测试行程...')
-        
-        const testPlanResult = await supabaseService.createTestPlanWithActivities()
-        if (testPlanResult.success && testPlanResult.data) {
-          console.log('测试行程创建成功，获取新行程详情...')
-          // 获取刚创建的测试行程详情
-          const newResult = await supabaseService.getPlanDetail(testPlanResult.data.planId)
-          if (newResult.success && newResult.data) {
-            const activities = Array.isArray(newResult.data.activities) ? newResult.data.activities : []
-            plan.value = {
-              ...newResult.data,
-              activities: activities
-            }
-            activeDay.value = 1
-            console.log('成功加载测试行程')
-            return // 成功获取测试行程，直接返回
-          }
-        }
-        
-        // 如果创建测试行程也失败，才抛出错误
-        throw new Error('行程不存在且无法创建测试行程')
+        // 数据库获取失败，直接抛出错误（不再创建测试行程）
+        console.error('获取用户行程详情失败:', result.error || '未知错误')
+        throw new Error(result.error || '行程不存在或您没有权限访问')
       }
     } else {
       // 新建行程页面，显示空行程状态

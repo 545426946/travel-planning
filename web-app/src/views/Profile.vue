@@ -1,329 +1,399 @@
 <template>
   <div class="profile">
-    <div class="page-header">
-      <h1>个人中心</h1>
-    </div>
 
-    <!-- 用户信息卡片 -->
-    <a-row :gutter="[24, 24]">
-      <a-col :xs="24" :lg="8">
-        <a-card class="user-card">
-          <div class="user-info">
-            <a-avatar :size="80" :src="user.avatar" class="user-avatar">
-              <UserOutlined v-if="!user.avatar" />
-            </a-avatar>
-            <div class="user-details">
-              <h2>{{ user.username || '游客' }}</h2>
-              <p class="user-email">{{ user.email || '请登录查看详细信息' }}</p>
-              <a-tag v-if="user.isMember" color="gold">会员</a-tag>
-              <a-tag v-else color="default">普通用户</a-tag>
+    <div class="profile-content">
+      <!-- 用户信息卡片 -->
+      <a-card class="user-info-card">
+        <div class="user-header">
+          <a-avatar size="80" class="user-avatar">
+            {{ currentUser.username?.charAt(0)?.toUpperCase() || 'U' }}
+          </a-avatar>
+          <div class="user-details">
+            <h2>{{ currentUser.displayName || currentUser.username }}</h2>
+            <p class="user-email">{{ currentUser.email || '未设置邮箱' }}</p>
+            <p class="user-join-date">
+              注册时间：{{ formatJoinDate(currentUser.createdAt) }}
+            </p>
+          </div>
+        </div>
+      </a-card>
+
+      <!-- 统计信息 -->
+      <a-row :gutter="[24, 24]" class="stats-row">
+        <a-col :span="8">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <FileTextOutlined class="stat-icon" />
+              <div class="stat-info">
+                <div class="stat-number">{{ userStats.totalPlans }}</div>
+                <div class="stat-label">总行程数</div>
+              </div>
             </div>
-          </div>
-          
-          <div class="user-stats">
-            <a-statistic title="已创建行程" :value="userStats.plans" />
-            <a-statistic title="已访问景点" :value="userStats.visitedDestinations" />
-            <a-statistic title="总消费" :value="userStats.totalSpent" prefix="¥" />
-          </div>
-        </a-card>
-      </a-col>
+          </a-card>
+        </a-col>
+        <a-col :span="8">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <CalendarOutlined class="stat-icon" />
+              <div class="stat-info">
+                <div class="stat-number">{{ userStats.totalDays }}</div>
+                <div class="stat-label">总天数</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+        <a-col :span="8">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <DollarOutlined class="stat-icon" />
+              <div class="stat-info">
+                <div class="stat-number">¥{{ userStats.totalBudget }}</div>
+                <div class="stat-label">总预算</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
 
-      <a-col :xs="24" :lg="16">
-        <!-- 功能菜单 -->
-        <a-card title="功能菜单" class="menu-card">
-          <a-list item-layout="horizontal">
-            <a-list-item @click="$router.push('/plans')">
+      <!-- 最近行程 -->
+      <a-card title="最近行程" class="recent-plans-card">
+        <a-list
+          :data-source="recentPlans"
+          :loading="loading"
+          item-layout="horizontal"
+        >
+          <template #renderItem="{ item }">
+            <a-list-item class="plan-item">
               <a-list-item-meta
-                title="我的行程"
-                description="查看和管理您的旅行计划"
+                :title="item.title"
+                :description="item.description"
               >
                 <template #avatar>
-                  <ScheduleOutlined style="font-size: 24px; color: #1890ff;" />
+                  <a-avatar>{{ item.is_ai_generated ? '🤖' : '✈️' }}</a-avatar>
                 </template>
               </a-list-item-meta>
+              
+              <div class="plan-info">
+                <a-space>
+                  <span><CalendarOutlined /> {{ item.days }}天</span>
+                  <span><DollarOutlined /> ¥{{ item.budget }}</span>
+                  <span><UserOutlined /> {{ item.travelers }}人</span>
+                </a-space>
+              </div>
+              
+              <template #actions>
+                <a-button type="link" @click="viewPlan(item)">
+                  <template #icon><EyeOutlined /></template>
+                  查看
+                </a-button>
+              </template>
             </a-list-item>
-            
-            <a-list-item @click="$router.push('/destinations')">
-              <a-list-item-meta
-                title="热门景点"
-                description="探索世界各地的特色景点"
-              >
-                <template #avatar>
-                  <CompassOutlined style="font-size: 24px; color: #52c41a;" />
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-            
-            <a-list-item @click="showSettings = true">
-              <a-list-item-meta
-                title="设置"
-                description="个性化设置和偏好"
-              >
-                <template #avatar>
-                  <SettingOutlined style="font-size: 24px; color: #faad14;" />
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-            
-            <a-list-item v-if="user" @click="logout">
-              <a-list-item-meta
-                title="退出登录"
-                description="安全退出当前账户"
-              >
-                <template #avatar>
-                  <LogoutOutlined style="font-size: 24px; color: #ff4d4f;" />
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-            
-            <a-list-item v-else @click="$emit('showLogin')">
-              <a-list-item-meta
-                title="登录/注册"
-                description="登录或注册新账户"
-              >
-                <template #avatar>
-                  <LoginOutlined style="font-size: 24px; color: #722ed1;" />
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-          </a-list>
-        </a-card>
-
-        <!-- 最近行程 -->
-        <a-card title="最近行程" class="recent-plans-card">
-          <a-list
-            :data-source="recentPlans"
-            :loading="loading"
-            item-layout="horizontal"
-          >
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <a-list-item-meta
-                  :title="item.title"
-                  :description="`${item.days}天 · ¥${item.budget}`"
-                >
-                  <template #avatar>
-                    <a-avatar :src="item.icon" />
-                  </template>
-                </a-list-item-meta>
-                <template #actions>
-                  <a-button type="link" @click="viewPlan(item)">查看</a-button>
-                </template>
-              </a-list-item>
-            </template>
-          </a-list>
+          </template>
           
-          <div v-if="recentPlans.length === 0" class="empty-state">
-            <a-empty description="暂无行程记录">
+          <template #empty>
+            <div class="empty-state">
+              <FileTextOutlined class="empty-icon" />
+              <p>暂无行程记录</p>
               <a-button type="primary" @click="$router.push('/plans')">
                 创建第一个行程
               </a-button>
-            </a-empty>
-          </div>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <!-- 设置模态框 -->
-    <a-modal
-      v-model:open="showSettings"
-      title="设置"
-      width="500px"
-      :footer="null"
-    >
-      <a-tabs>
-        <a-tab-pane key="profile" tab="个人信息">
-          <a-form layout="vertical">
-            <a-form-item label="用户名">
-              <a-input :value="user.username" />
-            </a-form-item>
-            <a-form-item label="邮箱">
-              <a-input :value="user.email" />
-            </a-form-item>
-            <a-form-item label="个人简介">
-              <a-textarea placeholder="介绍一下自己..." :rows="3" />
-            </a-form-item>
-          </a-form>
-        </a-tab-pane>
-        
-        <a-tab-pane key="preferences" tab="偏好设置">
-          <a-form layout="vertical">
-            <a-form-item label="主题">
-              <a-radio-group v-model:value="theme">
-                <a-radio value="light">浅色</a-radio>
-                <a-radio value="dark">深色</a-radio>
-                <a-radio value="auto">自动</a-radio>
-              </a-radio-group>
-            </a-form-item>
-            <a-form-item label="语言">
-              <a-select v-model:value="language" style="width: 200px">
-                <a-select-option value="zh-CN">中文</a-select-option>
-                <a-select-option value="en-US">English</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-form>
-        </a-tab-pane>
-      </a-tabs>
-    </a-modal>
+            </div>
+          </template>
+        </a-list>
+      </a-card>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { 
-  UserOutlined, 
-  ScheduleOutlined, 
-  CompassOutlined, 
-  SettingOutlined, 
-  LogoutOutlined,
-  LoginOutlined 
-} from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import { 
+  UserOutlined,
+  FileTextOutlined,
+  CalendarOutlined,
+  DollarOutlined,
+  EyeOutlined
+} from '@ant-design/icons-vue'
+import authService from '../services/authService'
+import supabaseAuthService from '../services/supabaseAuthService'
 
 const router = useRouter()
-
 const loading = ref(false)
-const showSettings = ref(false)
-const theme = ref('light')
-const language = ref('zh-CN')
 
-const user = ref({
-  username: '旅行者',
-  email: 'traveler@example.com',
-  avatar: null,
-  isMember: true
+// 响应式状态管理
+const authState = reactive({
+  isLoggedIn: authService.isLoggedIn(),
+  currentUser: authService.getCurrentUser()
 })
 
+// 计算属性
+const isLoggedIn = computed(() => authState.isLoggedIn)
+const currentUser = computed(() => authState.currentUser)
+
+// 响应式数据
 const userStats = ref({
-  plans: 5,
-  visitedDestinations: 12,
-  totalSpent: 8560
+  totalPlans: 0,
+  totalDays: 0,
+  totalBudget: 0
 })
 
-const recentPlans = ref([
-  {
-    id: 1,
-    title: '北京文化之旅',
-    days: 3,
-    budget: 2500,
-    icon: '🏯'
-  },
-  {
-    id: 2,
-    title: '上海现代游',
-    days: 2,
-    budget: 1800,
-    icon: '🏙️'
-  }
-])
+const recentPlans = ref([])
 
-const logout = () => {
-  user.value = null
-  userStats.value = { plans: 0, visitedDestinations: 0, totalSpent: 0 }
-  recentPlans.value = []
-  message.success('已退出登录')
+// 监听认证状态变化
+const handleAuthStateChange = () => {
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+  
+  // 如果用户已登出，重定向到首页
+  if (!authState.isLoggedIn) {
+    message.info('您已退出登录')
+    router.push('/')
+  }
+}
+
+const formatJoinDate = (dateString) => {
+  if (!dateString) return '未知'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 }
 
 const viewPlan = (plan) => {
+  // 这里可以添加查看行程详情的逻辑
   message.info(`查看行程: ${plan.title}`)
 }
 
-onMounted(() => {
-  // 加载用户数据
-  loading.value = true
-  setTimeout(() => {
+const loadUserStats = async () => {
+  if (!isLoggedIn.value) return
+  
+  try {
+    loading.value = true
+    const result = await supabaseAuthService.getUserStats()
+    
+    if (result.success) {
+      userStats.value = result.data
+    }
+  } catch (error) {
+    console.error('加载用户统计失败:', error)
+  } finally {
     loading.value = false
-  }, 1000)
+  }
+}
+
+const loadRecentPlans = async () => {
+  if (!isLoggedIn.value) return
+  
+  try {
+    const result = await supabaseAuthService.getUserPlans()
+    
+    if (result.success) {
+      recentPlans.value = result.data.slice(0, 5) // 只显示最近5个行程
+    }
+  } catch (error) {
+    console.error('加载最近行程失败:', error)
+  }
+}
+
+onMounted(() => {
+  // 初始化认证状态
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+  
+  // 添加认证状态变化监听器
+  window.addEventListener('authStateChange', handleAuthStateChange)
+  
+  // 检查用户是否已登录
+  if (!isLoggedIn.value) {
+    message.error('请先登录')
+    router.push('/')
+    return
+  }
+  
+  // 加载用户数据
+  loadUserStats()
+  loadRecentPlans()
+})
+
+// 组件卸载时移除监听器
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  window.removeEventListener('authStateChange', handleAuthStateChange)
 })
 </script>
 
 <style scoped>
 .profile {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+/* 顶部导航栏样式 */
+.top-nav {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
+  z-index: 1000;
+  padding: 0 20px;
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-content {
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
 }
 
-.page-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.page-header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.user-card {
-  height: 100%;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
+.user-info-card {
   margin-bottom: 24px;
 }
 
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
 .user-avatar {
-  margin-right: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-size: 32px;
+  font-weight: 600;
+  color: white;
 }
 
 .user-details h2 {
   margin: 0 0 8px 0;
   font-size: 1.5rem;
   font-weight: 600;
+  color: #1f2937;
 }
 
 .user-email {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   color: #6b7280;
 }
 
-.user-stats {
-  display: grid;
-  gap: 16px;
+.user-join-date {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
 }
 
-.menu-card {
+.stats-row {
   margin-bottom: 24px;
 }
 
+.stat-card {
+  height: 100%;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-icon {
+  font-size: 2rem;
+  color: #667eea;
+}
+
+.stat-number {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.stat-label {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
 .recent-plans-card {
-  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.plan-item {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.plan-item:last-child {
+  border-bottom: none;
 }
 
 .empty-state {
+  text-align: center;
   padding: 40px 0;
 }
 
-:deep(.ant-list-item) {
-  cursor: pointer;
-  transition: background-color 0.3s;
+.empty-icon {
+  font-size: 3rem;
+  color: #d1d5db;
+  margin-bottom: 16px;
 }
 
-:deep(.ant-list-item:hover) {
-  background-color: #f5f5f5;
+.empty-state p {
+  color: #6b7280;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {
-  .profile {
+  .profile-content {
     padding: 20px 16px;
   }
   
-  .page-header h1 {
-    font-size: 2rem;
-  }
-  
-  .user-info {
+  .user-header {
     flex-direction: column;
     text-align: center;
+    gap: 16px;
   }
   
-  .user-avatar {
-    margin-right: 0;
+  .stats-row {
     margin-bottom: 16px;
+  }
+  
+  .stat-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
   }
 }
 </style>

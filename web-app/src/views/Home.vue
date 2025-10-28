@@ -1,5 +1,6 @@
 <template>
   <div class="home">
+
     <!-- 英雄区域 -->
     <a-row class="hero-section" :gutter="[60, 0]">
       <a-col :span="12">
@@ -7,14 +8,19 @@
           <h1 class="hero-title">轻松规划完美旅程</h1>
           <p class="hero-subtitle">专为大学生设计的旅行规划工具</p>
           <div class="hero-actions">
-            <a-button type="primary" size="large" @click="$router.push('/plans')">
+            <a-button type="primary" size="large" @click="handleStartPlanning">
               <template #icon><RocketOutlined /></template>
-              开始规划
+              {{ isLoggedIn ? '开始规划' : '立即体验' }}
             </a-button>
             <a-button size="large" @click="$router.push('/destinations')">
               <template #icon><CompassOutlined /></template>
               探索景点
             </a-button>
+          </div>
+          <div v-if="!isLoggedIn" class="hero-login-tip">
+            <a-typography-text type="secondary">
+              注册账号可保存您的旅行计划
+            </a-typography-text>
           </div>
         </div>
       </a-col>
@@ -82,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { 
   RocketOutlined, 
   CompassOutlined, 
@@ -90,11 +96,49 @@ import {
   DollarOutlined, 
   StarOutlined 
 } from '@ant-design/icons-vue'
+import authService from '../services/authService'
+
+// 响应式状态管理
+const authState = reactive({
+  isLoggedIn: authService.isLoggedIn(),
+  currentUser: authService.getCurrentUser()
+})
+
+// 计算属性
+const isLoggedIn = computed(() => authState.isLoggedIn)
+const currentUser = computed(() => authState.currentUser)
 
 const destinations = ref([])
 const templates = ref([])
 
+// 监听认证状态变化
+const handleAuthStateChange = () => {
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+}
+
+const handleStartPlanning = () => {
+  if (isLoggedIn.value) {
+    // 已登录，跳转到行程规划页面
+    window.$router.push('/plans')
+  } else {
+    // 未登录，打开登录模态框
+    window.dispatchEvent(new CustomEvent('openAuthModal', {
+      detail: { mode: 'login' }
+    }))
+  }
+}
+
 onMounted(() => {
+  // 初始化认证状态
+  authState.isLoggedIn = authService.isLoggedIn()
+  authState.currentUser = authService.getCurrentUser()
+  
+  // 添加认证状态变化监听器
+  window.addEventListener('authStateChange', handleAuthStateChange)
+  
+  
+  
   // 模拟数据加载
   destinations.value = [
     {
@@ -164,6 +208,13 @@ onMounted(() => {
       rating: 4.9
     }
   ]
+})
+
+// 组件卸载时移除监听器
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  window.removeEventListener('authStateChange', handleAuthStateChange)
+  window.removeEventListener('openAuthModal', handleAuthStateChange)
 })
 </script>
 

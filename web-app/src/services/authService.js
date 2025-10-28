@@ -223,6 +223,9 @@ class AuthService {
               this.setStoredSessionToken(this.sessionToken)
               this.setStoredUser(this.currentUser)
               
+              // 通知状态变化
+              this.notifyListeners()
+              
               message.success(`欢迎回来，${userData.display_name || userData.username}！`)
               return { success: true, user: this.currentUser }
             }

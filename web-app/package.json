@@ -10,7 +10,6 @@
     "serve": "vite preview --port 8000"
   },
   "dependencies": {
-    "@ant-design/icons-vue": "^7.0.1",
     "@supabase/supabase-js": "^2.38.0",
     "ant-design-vue": "^4.0.0",
     "vue": "^3.3.4",

@@ -111,6 +111,180 @@ const currentUser = computed(() => authState.currentUser)
 const destinations = ref([])
 const templates = ref([])
 
+// 从热门景点数据中随机抽取4个景点
+const getRandomDestinations = () => {
+  const allDestinations = [
+    {
+      id: 1,
+      name: "北京",
+      location: "华北地区",
+      description: "中国的首都，拥有故宫、长城等世界文化遗产",
+      type: "历史文化",
+      region: "north",
+      icon: "🏯",
+      image: "/images/cities/beijing.png",
+      tags: ["历史文化", "皇家宫殿", "长城", "美食"],
+      bestSeason: "春秋季",
+      avgBudget: 500
+    },
+    {
+      id: 2,
+      name: "上海",
+      location: "华东地区",
+      description: "现代化国际大都市，外滩夜景和迪士尼乐园著名",
+      type: "现代都市",
+      region: "east",
+      icon: "🏙️",
+      image: "/images/cities/shanghai.png",
+      tags: ["现代都市", "购物天堂", "夜景", "迪士尼"],
+      bestSeason: "春秋季",
+      avgBudget: 600
+    },
+    {
+      id: 3,
+      name: "西安",
+      location: "西北地区",
+      description: "古都长安，兵马俑和古城墙见证千年历史",
+      type: "历史文化",
+      region: "northwest",
+      icon: "🗿",
+      image: "/images/cities/xian.png",
+      tags: ["古都文化", "兵马俑", "丝绸之路", "美食"],
+      bestSeason: "春秋季",
+      avgBudget: 400
+    },
+    {
+      id: 4,
+      name: "杭州",
+      location: "华东地区",
+      description: "西湖美景，龙井茶文化，江南水乡的代表",
+      type: "自然风光",
+      region: "east",
+      icon: "🌊",
+      image: "/images/cities/hangzhou.png",
+      tags: ["西湖", "龙井茶", "江南水乡", "休闲"],
+      bestSeason: "春季",
+      avgBudget: 450
+    },
+    {
+      id: 5,
+      name: "成都",
+      location: "西南地区",
+      description: "天府之国，大熊猫基地和川菜美食闻名",
+      type: "美食之都",
+      region: "southwest",
+      icon: "🐼",
+      image: "/images/cities/chengdu.png",
+      tags: ["大熊猫", "川菜美食", "休闲城市", "茶馆"],
+      bestSeason: "春秋季",
+      avgBudget: 400
+    },
+    {
+      id: 6,
+      name: "桂林",
+      location: "华南地区",
+      description: "山水甲天下，漓江风光和喀斯特地貌",
+      type: "自然风光",
+      region: "south",
+      icon: "⛰️",
+      image: "/images/cities/guilin.png",
+      tags: ["山水风光", "漓江", "喀斯特", "摄影"],
+      bestSeason: "春秋季",
+      avgBudget: 350
+    },
+    {
+      id: 7,
+      name: "厦门",
+      location: "华南地区",
+      description: "海滨城市，鼓浪屿和环岛路风景优美",
+      type: "海滨城市",
+      region: "south",
+      icon: "🏖️",
+      image: "/images/cities/xiamen.png",
+      tags: ["海滨城市", "鼓浪屿", "海岛风光", "海鲜"],
+      bestSeason: "春秋季",
+      avgBudget: 450
+    },
+    {
+      id: 8,
+      name: "南京",
+      location: "华东地区",
+      description: "六朝古都，中山陵和夫子庙文化底蕴深厚",
+      type: "历史文化",
+      region: "east",
+      icon: "🏛️",
+      image: "/images/cities/nanjing.png",
+      tags: ["古都文化", "中山陵", "夫子庙", "历史"],
+      bestSeason: "春秋季",
+      avgBudget: 400
+    },
+    {
+      id: 9,
+      name: "丽江",
+      location: "西南地区",
+      description: "古城风情，玉龙雪山和纳西文化",
+      type: "自然风光",
+      region: "southwest",
+      icon: "🏔️",
+      image: "/images/cities/lijiang.png",
+      tags: ["古城", "玉龙雪山", "少数民族", "摄影"],
+      bestSeason: "春秋季",
+      avgBudget: 400
+    },
+    {
+      id: 10,
+      name: "青岛",
+      location: "华东地区",
+      description: "海滨城市，啤酒文化和德式建筑",
+      type: "海滨城市",
+      region: "east",
+      icon: "🍺",
+      image: "/images/cities/qingdao.png",
+      tags: ["海滨", "啤酒", "德式建筑", "海鲜"],
+      bestSeason: "夏季",
+      avgBudget: 450
+    },
+    {
+      id: 11,
+      name: "张家界",
+      location: "华中地区",
+      description: "奇峰异石，国家森林公园和玻璃栈道",
+      type: "自然风光",
+      region: "central",
+      icon: "🌄",
+      image: "/images/cities/zhangjiajie.png",
+      tags: ["奇峰", "森林公园", "玻璃栈道", "摄影"],
+      bestSeason: "春秋季",
+      avgBudget: 400
+    },
+    {
+      id: 12,
+      name: "哈尔滨",
+      location: "东北地区",
+      description: "冰雪之城，冰雕艺术和俄式建筑",
+      type: "现代都市",
+      region: "northeast",
+      icon: "❄️",
+      image: "/images/cities/haerbing.png",
+      tags: ["冰雪", "冰雕", "俄式建筑", "冬季"],
+      bestSeason: "冬季",
+      avgBudget: 500
+    }
+  ]
+  
+  // 随机打乱数组并取前4个
+  const shuffled = [...allDestinations].sort(() => 0.5 - Math.random())
+  return shuffled.slice(0, 4).map(dest => ({
+    id: dest.id,
+    name: dest.name,
+    location: dest.location,
+    image: dest.image,
+    icon: dest.icon,
+    type: dest.type,
+    budget: dest.avgBudget
+  }))
+}
+
 // 监听认证状态变化
 const handleAuthStateChange = () => {
   authState.isLoggedIn = authService.isLoggedIn()
@@ -139,45 +313,8 @@ onMounted(() => {
   
   
   
-  // 模拟数据加载
-  destinations.value = [
-    {
-      id: 1,
-      name: '北京',
-      location: '中国',
-      image: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=300',
-      icon: '🏯',
-      type: '文化',
-      budget: 300
-    },
-    {
-      id: 2,
-      name: '上海',
-      location: '中国',
-      image: 'https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=300',
-      icon: '🏙️',
-      type: '现代',
-      budget: 400
-    },
-    {
-      id: 3,
-      name: '杭州',
-      location: '中国',
-      image: 'https://images.unsplash.com/photo-1531183208301-0a43d8b828d0?w=300',
-      icon: '🏞️',
-      type: '自然',
-      budget: 250
-    },
-    {
-      id: 4,
-      name: '成都',
-      location: '中国',
-      image: 'https://images.unsplash.com/photo-1594819047050-99b4ae3a2fdf?w=300',
-      icon: '🐼',
-      type: '美食',
-      budget: 200
-    }
-  ]
+  // 随机抽取4个热门目的地
+  destinations.value = getRandomDestinations()
 
   templates.value = [
     {

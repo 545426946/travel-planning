@@ -70,7 +70,7 @@
         >
           <template #cover>
             <div class="destination-cover">
-              <img :alt="destination.name" :src="destination.image" />
+              <img :alt="destination.name" :src="destination.image" loading="lazy" />
               <div class="destination-icon">{{ destination.icon }}</div>
               <div class="destination-budget">¥{{ destination.avgBudget }}/天</div>
             </div>
@@ -131,7 +131,7 @@
       <div v-if="selectedDestination" class="destination-detail">
         <a-row :gutter="[24, 24]">
           <a-col :span="12">
-            <img :src="selectedDestination.image" :alt="selectedDestination.name" class="detail-image" />
+            <img :src="selectedDestination.image" :alt="selectedDestination.name" class="detail-image" loading="lazy" />
             <div class="destination-info">
               <div class="info-item">
                 <span class="info-label">地区：</span>
@@ -197,7 +197,7 @@ const destinations = ref([
     type: "history",
     region: "north",
     icon: "🏯",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/beijing.png",
     tags: ["历史文化", "皇家宫殿", "长城", "美食"],
     bestSeason: "春秋季",
     avgBudget: 500
@@ -210,7 +210,7 @@ const destinations = ref([
     type: "modern",
     region: "east",
     icon: "🏙️",
-    image: "https://images.unsplash.com/photo-1541332246502-bc8f5b3c3b2a?w=400",
+    image: "/images/cities/shanghai.png",
     tags: ["现代都市", "购物天堂", "夜景", "迪士尼"],
     bestSeason: "春秋季",
     avgBudget: 600
@@ -223,7 +223,7 @@ const destinations = ref([
     type: "history",
     region: "northwest",
     icon: "🗿",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/xian.png",
     tags: ["古都文化", "兵马俑", "丝绸之路", "美食"],
     bestSeason: "春秋季",
     avgBudget: 400
@@ -236,7 +236,7 @@ const destinations = ref([
     type: "nature",
     region: "east",
     icon: "🌊",
-    image: "https://images.unsplash.com/photo-1535957998253-26ae1ef29506?w=400",
+    image: "/images/cities/hangzhou.png",
     tags: ["西湖", "龙井茶", "江南水乡", "休闲"],
     bestSeason: "春季",
     avgBudget: 450
@@ -249,7 +249,7 @@ const destinations = ref([
     type: "food",
     region: "southwest",
     icon: "🐼",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/chengdu.png",
     tags: ["大熊猫", "川菜美食", "休闲城市", "茶馆"],
     bestSeason: "春秋季",
     avgBudget: 400
@@ -262,7 +262,7 @@ const destinations = ref([
     type: "nature",
     region: "south",
     icon: "⛰️",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/guilin.png",
     tags: ["山水风光", "漓江", "喀斯特", "摄影"],
     bestSeason: "春秋季",
     avgBudget: 350
@@ -275,7 +275,7 @@ const destinations = ref([
     type: "coastal",
     region: "south",
     icon: "🏖️",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/xiamen.png",
     tags: ["海滨城市", "鼓浪屿", "海岛风光", "海鲜"],
     bestSeason: "春秋季",
     avgBudget: 450
@@ -288,7 +288,7 @@ const destinations = ref([
     type: "history",
     region: "east",
     icon: "🏛️",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/nanjing.png",
     tags: ["古都文化", "中山陵", "夫子庙", "历史"],
     bestSeason: "春秋季",
     avgBudget: 400
@@ -301,7 +301,7 @@ const destinations = ref([
     type: "nature",
     region: "southwest",
     icon: "🏔️",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/lijiang.png",
     tags: ["古城", "玉龙雪山", "少数民族", "摄影"],
     bestSeason: "春秋季",
     avgBudget: 400
@@ -314,7 +314,7 @@ const destinations = ref([
     type: "coastal",
     region: "east",
     icon: "🍺",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/qingdao.png",
     tags: ["海滨", "啤酒", "德式建筑", "海鲜"],
     bestSeason: "夏季",
     avgBudget: 450
@@ -327,7 +327,7 @@ const destinations = ref([
     type: "nature",
     region: "central",
     icon: "🌄",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/zhangjiajie.png",
     tags: ["奇峰", "森林公园", "玻璃栈道", "摄影"],
     bestSeason: "春秋季",
     avgBudget: 400
@@ -340,7 +340,7 @@ const destinations = ref([
     type: "modern",
     region: "northeast",
     icon: "❄️",
-    image: "https://images.unsplash.com/photo-1542662565-7e4b66bae529?w=400",
+    image: "/images/cities/haerbing.png",
     tags: ["冰雪", "冰雕", "俄式建筑", "冬季"],
     bestSeason: "冬季",
     avgBudget: 500

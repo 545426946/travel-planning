@@ -44,7 +44,9 @@
             </template>
             <a-card-meta :title="destination.name" :description="destination.location">
               <template #avatar>
-                <a-avatar :src="destination.icon" />
+                <div class="city-icon">
+                  <component :is="getCityIcon(destination.name)" />
+                </div>
               </template>
             </a-card-meta>
             <div class="destination-info">
@@ -67,7 +69,9 @@
               :description="template.description"
             >
               <template #avatar>
-                <a-avatar :src="template.icon" />
+                <div class="template-icon">
+                  <component :is="getTemplateIcon(template.title)" />
+                </div>
               </template>
             </a-card-meta>
             <div class="template-meta">
@@ -89,14 +93,26 @@
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
-import { 
-  RocketOutlined, 
-  CompassOutlined, 
-  CalendarOutlined, 
-  DollarOutlined, 
-  StarOutlined 
-} from '@ant-design/icons-vue'
 import authService from '../services/authService'
+
+// 导入所需的图标组件
+import {
+  BankOutlined,
+  RocketOutlined,
+  CrownOutlined,
+  HeartOutlined,
+  SmileOutlined,
+  EnvironmentOutlined,
+  CloudOutlined,
+  FlagOutlined,
+  CameraOutlined,
+  TrophyOutlined,
+  FireOutlined,
+  PictureOutlined,
+  CalendarOutlined,
+  DollarOutlined,
+  StarOutlined
+} from '@ant-design/icons-vue'
 
 // 响应式状态管理
 const authState = reactive({
@@ -291,6 +307,35 @@ const handleAuthStateChange = () => {
   authState.currentUser = authService.getCurrentUser()
 }
 
+// 获取城市图标 - 使用更美观且符合城市特色的图标
+const getCityIcon = (cityName) => {
+  const iconMap = {
+    '北京': BankOutlined,        // 历史文化 - 银行/建筑（代表历史文化）
+    '上海': RocketOutlined,      // 现代都市 - 火箭/发展（代表现代化）
+    '西安': CrownOutlined,       // 古都文化 - 皇冠/帝王（代表帝王之都）
+    '杭州': HeartOutlined,      // 西湖美景 - 爱心/浪漫（代表浪漫西湖）
+    '成都': SmileOutlined,       // 天府之国 - 笑脸/休闲（代表休闲城市）
+    '桂林': EnvironmentOutlined, // 山水风光 - 环境/自然（代表自然风光）
+    '厦门': CloudOutlined,      // 海滨城市 - 云朵/海岛（代表海岛风光）
+    '南京': FlagOutlined,       // 六朝古都 - 旗帜/历史（代表历史名城）
+    '丽江': CameraOutlined,      // 古城风情 - 相机/摄影（代表摄影胜地）
+    '青岛': TrophyOutlined,     // 海滨啤酒 - 奖杯/荣誉（代表啤酒文化）
+    '张家界': FireOutlined,     // 奇峰异石 - 火焰/热情（代表奇峰异石）
+    '哈尔滨': PictureOutlined   // 冰雪之城 - 图片/风景（代表冰雪文化）
+  }
+  return iconMap[cityName] || BankOutlined
+}
+
+// 获取模板图标 - 使用更美观且符合模板特色的图标
+const getTemplateIcon = (templateTitle) => {
+  // 根据标题中的关键词匹配图标
+  if (templateTitle.includes('北京')) return BankOutlined        // 历史文化模板
+  if (templateTitle.includes('上海')) return RocketOutlined      // 现代都市模板
+  if (templateTitle.includes('杭州')) return HeartOutlined      // 浪漫休闲模板
+  
+  return BankOutlined
+}
+
 const handleStartPlanning = () => {
   if (isLoggedIn.value) {
     // 已登录，跳转到行程规划页面
@@ -429,6 +474,95 @@ onUnmounted(() => {
   margin-top: 16px;
 }
 
+/* 城市图标样式 */
+.city-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1890ff, #52c41a);
+  color: white;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.city-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 模板图标样式 */
+.template-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fa8c16, #f5222d);
+  color: white;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.template-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 为不同城市设置不同的图标颜色 */
+.city-icon .anticon-bank {
+  color: #1890ff;
+}
+
+.city-icon .anticon-city {
+  color: #52c41a;
+}
+
+.city-icon .anticon-crown {
+  color: #faad14;
+}
+
+.city-icon .anticon-heart {
+  color: #eb2f96;
+}
+
+.city-icon .anticon-panda {
+  color: #13c2c2;
+}
+
+.city-icon .anticon-mountain {
+  color: #722ed1;
+}
+
+.city-icon .anticon-cloud {
+  color: #2f54eb;
+}
+
+.city-icon .anticon-flag {
+  color: #fa541c;
+}
+
+.city-icon .anticon-fire {
+  color: #f5222d;
+}
+
+.city-icon .anticon-trophy {
+  color: #fa8c16;
+}
+
+.city-icon .anticon-picture {
+  color: #1890ff;
+}
+
+.city-icon .anticon-snow {
+  color: #13c2c2;
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2rem;
@@ -436,6 +570,13 @@ onUnmounted(() => {
   
   .hero-actions {
     flex-direction: column;
+  }
+  
+  .city-icon,
+  .template-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
   }
 }
 </style>

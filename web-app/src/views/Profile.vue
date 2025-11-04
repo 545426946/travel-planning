@@ -6,10 +6,10 @@
       <a-card class="user-info-card">
         <div class="user-header">
           <a-avatar size="80" class="user-avatar">
-            {{ currentUser.username?.charAt(0)?.toUpperCase() || 'U' }}
+            {{ (currentUser.displayName || currentUser.username || 'U')?.charAt(0)?.toUpperCase() || 'U' }}
           </a-avatar>
           <div class="user-details">
-            <h2>{{ currentUser.displayName || currentUser.username }}</h2>
+            <h2>{{ currentUser.displayName || currentUser.username || '用户' }}</h2>
             <p class="user-email">{{ currentUser.email || '未设置邮箱' }}</p>
             <p class="user-join-date">
               注册时间：{{ formatJoinDate(currentUser.createdAt) }}

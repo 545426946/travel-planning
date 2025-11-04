@@ -121,12 +121,7 @@
         </a-form-item>
         
         <a-form-item label="目的地" name="destination">
-          <a-select v-model:value="createForm.destination" placeholder="请选择目的地">
-            <a-select-option value="beijing">北京</a-select-option>
-            <a-select-option value="shanghai">上海</a-select-option>
-            <a-select-option value="hangzhou">杭州</a-select-option>
-            <a-select-option value="chengdu">成都</a-select-option>
-          </a-select>
+          <a-input v-model:value="createForm.destination" placeholder="请输入目的地（如：北京、上海、杭州等）" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -136,7 +131,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { 
   PlusOutlined, 
   CalendarOutlined, 
@@ -171,28 +166,7 @@ const createRules = {
   budget: [{ required: true, message: '请输入预算', trigger: 'blur' }]
 }
 
-const plans = ref([
-  {
-    id: 1,
-    title: '北京文化之旅',
-    description: '探索故宫、长城等历史文化景点',
-    icon: '🏯',
-    days: 3,
-    budget: 2500,
-    travelers: 2,
-    status: 'planning'
-  },
-  {
-    id: 2,
-    title: '上海现代游',
-    description: '体验上海的现代化都市魅力',
-    icon: '🏙️',
-    days: 2,
-    budget: 1800,
-    travelers: 1,
-    status: 'completed'
-  }
-])
+const plans = ref([])
 
 const handleCreatePlan = async () => {
   try {
@@ -262,11 +236,47 @@ const viewPlan = (plan) => {
 
 const deletePlan = async (plan) => {
   try {
+    // 使用 Ant Design 的确认对话框
+    const confirmResult = await new Promise((resolve) => {
+      Modal.confirm({
+        title: '确认删除行程',
+        content: `确定要删除行程"${plan.title}"吗？
+
+⚠️ 此操作将永久删除该行程及其所有活动数据，无法恢复！`,
+        okText: '确认删除',
+        cancelText: '取消',
+        okType: 'danger',
+        centered: true,
+        maskClosable: true,
+        onOk() {
+          resolve(true)
+        },
+        onCancel() {
+          resolve(false)
+        }
+      })
+    })
+    
+    if (!confirmResult) {
+      message.info('已取消删除操作')
+      return // 用户取消删除
+    }
+    
+    console.log('开始删除行程:', plan.title, 'ID:', plan.id)
     const result = await supabaseAuthService.deleteUserPlan(plan.id)
+    
     if (result.success) {
+      console.log('数据库删除成功')
+      // 立即从本地列表中移除以提供即时反馈
       plans.value = plans.value.filter(p => p.id !== plan.id)
-      message.success('行程已删除')
+      message.success(`行程"${plan.title}"已从数据库中永久删除`)
+      
+      // 立即重新从数据库加载行程列表，确保数据完全同步
+      await loadPlans()
+      
+      console.log('删除操作完成，数据已重新加载')
     } else {
+      console.error('删除失败:', result.error)
       message.error('删除失败：' + result.error)
     }
   } catch (error) {

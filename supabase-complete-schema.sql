@@ -76,6 +76,23 @@ CREATE TABLE IF NOT EXISTS public.plan_templates (
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 
+-- 4.1 创建旅游模板表（用于保存热门城市旅游模板）
+CREATE TABLE IF NOT EXISTS public.travel_templates (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    template_id INTEGER NOT NULL,
+    destination VARCHAR(100) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    days INTEGER NOT NULL,
+    budget NUMERIC(10,2) NOT NULL,
+    activities JSONB NOT NULL,
+    tags TEXT[],
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    UNIQUE(template_id)
+);
+
 -- 5. 创建景点信息表
 CREATE TABLE IF NOT EXISTS public.attractions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

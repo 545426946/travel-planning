@@ -38,7 +38,7 @@
       <h2 class="section-title">热门目的地</h2>
       <a-row :gutter="[24, 24]">
         <a-col :xs="24" :sm="12" :md="8" :lg="6" v-for="destination in destinations" :key="destination.id">
-          <a-card hoverable class="destination-card">
+          <a-card hoverable class="destination-card" @click="viewDestination(destination)">
             <template #cover>
               <img :alt="destination.name" :src="destination.image" />
             </template>
@@ -346,6 +346,15 @@ const handleStartPlanning = () => {
       detail: { mode: 'login' }
     }))
   }
+}
+
+// 查看目的地详情
+const viewDestination = (destination) => {
+  // 跳转到热门景点页面，并传递城市名称作为查询参数
+  window.$router.push({
+    path: '/destinations',
+    query: { city: destination.name }
+  })
 }
 
 onMounted(() => {

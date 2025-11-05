@@ -841,6 +841,7 @@ const getTemplatesForDestination = (destinationName) => {
     const dbTemplates = databaseTemplates.value.filter(template => template.destination === destinationName)
     console.log('数据库中找到的模板数量:', dbTemplates.length)
     if (dbTemplates.length > 0) {
+      console.log('使用数据库模板数据')
       return dbTemplates
     }
   }
@@ -871,7 +872,8 @@ const useTemplate = async (template) => {
   }
   
   try {
-    message.loading('正在创建行程...', 0)
+    // 显示等待提示
+    const loadingMessage = message.loading('正在使用模板创建行程，请稍后...', 0)
     
     // 将模板数据转换为用户行程格式
     const planData = {
@@ -922,7 +924,8 @@ const useTemplate = async (template) => {
         }
       }
       
-      message.destroy()
+      // 关闭等待提示并显示成功消息
+      loadingMessage()
       message.success(`"${template.title}"已成功保存到您的行程规划`)
       
       // 关闭详情模态框
@@ -932,11 +935,13 @@ const useTemplate = async (template) => {
       // router.push('/plans')
       
     } else {
-      message.destroy()
+      // 关闭等待提示并显示错误消息
+      loadingMessage()
       message.error(`保存失败: ${result.error}`)
       console.error('保存行程失败:', result.error)
     }
   } catch (error) {
+    // 关闭等待提示并显示错误消息
     message.destroy()
     message.error('创建行程时发生错误')
     console.error('使用模板时发生错误:', error)
@@ -978,6 +983,8 @@ const loadTemplatesFromDatabase = async () => {
       
       if (databaseTemplates.value.length === 0) {
         console.log('数据库中没有模板数据，将使用本地数据')
+      } else {
+        console.log('数据库模板数据加载成功，准备显示')
       }
     } else {
       console.warn('从数据库加载模板失败:', result.error)

@@ -173,8 +173,12 @@ const handleCreatePlan = async () => {
     await createFormRef.value.validate()
     creating.value = true
     
+    // 显示等待提示
+    const loadingMessage = message.loading('正在创建行程，请稍后...', 0)
+    
     // 检查用户是否已登录
     if (!authService.isLoggedIn()) {
+      loadingMessage()
       message.error('请先登录后再创建行程')
       return
     }
@@ -192,16 +196,21 @@ const handleCreatePlan = async () => {
     })
     
     if (result.success) {
+      // 关闭等待提示并显示成功消息
+      loadingMessage()
       message.success('行程创建成功')
       showCreateModal.value = false
       resetCreateForm()
       // 重新加载用户行程列表
       loadPlans()
     } else {
+      loadingMessage()
       message.error('创建失败：' + result.error)
     }
   } catch (error) {
     console.error('创建行程失败:', error)
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     message.error('创建失败，请重试')
   } finally {
     creating.value = false
@@ -262,13 +271,25 @@ const deletePlan = async (plan) => {
       return // 用户取消删除
     }
     
-    console.log('开始删除行程:', plan.title, 'ID:', plan.id)
+    console.log('开始删除行程:', plan.title, 'ID:', plan.id, '类型:', plan.is_ai_generated ? 'AI生成' : '手动创建')
+    
+    // 显示等待提示
+    const loadingMessage = message.loading('正在删除行程，请稍后...', 0)
+    
     const result = await supabaseAuthService.deleteUserPlan(plan.id)
     
     if (result.success) {
-      console.log('数据库删除成功')
+      console.log('数据库删除成功，结果:', result.data)
+      
       // 立即从本地列表中移除以提供即时反馈
+      const originalLength = plans.value.length
       plans.value = plans.value.filter(p => p.id !== plan.id)
+      const filteredLength = plans.value.length
+      
+      console.log(`本地列表更新：${originalLength} -> ${filteredLength} 个行程`)
+      
+      // 关闭等待提示并显示成功消息
+      loadingMessage()
       message.success(`行程"${plan.title}"已从数据库中永久删除`)
       
       // 立即重新从数据库加载行程列表，确保数据完全同步
@@ -277,10 +298,13 @@ const deletePlan = async (plan) => {
       console.log('删除操作完成，数据已重新加载')
     } else {
       console.error('删除失败:', result.error)
+      loadingMessage()
       message.error('删除失败：' + result.error)
     }
   } catch (error) {
     console.error('删除行程失败:', error)
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     message.error('删除失败，请重试')
   }
 }

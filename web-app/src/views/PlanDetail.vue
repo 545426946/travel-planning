@@ -197,6 +197,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
 import supabaseAuthService from '../services/supabaseAuthService'
 import authService from '../services/authService'
 
@@ -253,10 +254,19 @@ const currentDayActivities = computed(() => {
   
   // 过滤当前天数的活动并按顺序索引排序
   const filteredActivities = plan.value.activities
-    .filter(activity => activity.day_number === activeDay.value)
-    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    .filter(activity => {
+      // 确保activity存在且day_number有效
+      if (!activity) return false
+      const dayNum = parseInt(activity.day_number) || 1
+      return dayNum === activeDay.value
+    })
+    .sort((a, b) => {
+      const orderA = parseInt(a.order_index) || 0
+      const orderB = parseInt(b.order_index) || 0
+      return orderA - orderB
+    })
   
-  console.log(`第${activeDay.value}天的活动:`, filteredActivities)
+  console.log(`第${activeDay.value}天的活动数量:`, filteredActivities.length)
   return filteredActivities
 })
 
@@ -357,6 +367,9 @@ const saveActivity = async () => {
       return
     }
     
+    // 显示等待提示
+    const loadingMessage = message.loading('正在保存活动，请稍后...', 0)
+    
     // 创建活动数据对象
     const activityData = {
       plan_id: plan.value.id,
@@ -375,6 +388,7 @@ const saveActivity = async () => {
     if (!plan.value.id || plan.value.id === 'new') {
       // 检查用户是否已登录
       if (!authService.isLoggedIn()) {
+        loadingMessage()
         throw new Error('请先登录后再创建行程')
       }
       
@@ -394,6 +408,7 @@ const saveActivity = async () => {
         activityData.plan_id = plan.value.id
         console.log('行程已创建，ID:', plan.value.id)
       } else {
+        loadingMessage()
         throw new Error('创建行程失败: ' + (planResult.error || '未知错误'))
       }
     }
@@ -418,13 +433,19 @@ const saveActivity = async () => {
       if (!editingActivity.value && editForm.value.day_number !== activeDay.value) {
         activeDay.value = editForm.value.day_number
       }
+      
+      // 关闭等待提示并关闭弹窗
+      loadingMessage()
       closeEditModal()
     } else {
+      loadingMessage()
       throw new Error(result.error || '保存活动失败')
     }
     
   } catch (error) {
     console.error('保存活动失败:', error)
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     alert('保存活动失败: ' + error.message)
     // 重新加载数据以确保显示正确状态
     await fetchPlanDetail()
@@ -437,8 +458,12 @@ const deleteActivity = async () => {
   
   if (confirm('确定要删除这个活动吗？')) {
     try {
+      // 显示等待提示
+      const loadingMessage = message.loading('正在删除活动，请稍后...', 0)
+      
       // 确保行程ID存在
       if (!plan.value.id || plan.value.id === 'new') {
+        loadingMessage()
         throw new Error('无法删除未保存行程中的活动')
       }
       
@@ -453,13 +478,19 @@ const deleteActivity = async () => {
         console.log('活动删除成功')
         // 重新加载行程数据以确保显示最新信息
         await fetchPlanDetail()
+        
+        // 关闭等待提示并关闭弹窗
+        loadingMessage()
         closeEditModal()
       } else {
+        loadingMessage()
         throw new Error(result.error || '删除活动失败')
       }
       
     } catch (error) {
       console.error('删除活动失败:', error)
+      // 关闭等待提示并显示错误消息
+      message.destroy()
       alert('删除活动失败: ' + error.message)
       // 重新加载数据以恢复到正确状态
       await fetchPlanDetail()
@@ -527,10 +558,28 @@ const fetchPlanDetail = async () => {
           activities: activities
         }
         activeDay.value = 1
+        
+        // 调试信息：显示获取到的活动数据
+        console.log('获取到的行程数据:', {
+          title: result.data.title,
+          days: result.data.days,
+          activitiesCount: activities.length,
+          activities: activities.map(a => ({
+            title: a.activity_title,
+            day: a.day_number,
+            timeSlot: a.time_slot
+          }))
+        })
       } else {
-        // 数据库获取失败，直接抛出错误（不再创建测试行程）
+        // 数据库获取失败，提供更详细的错误信息
         console.error('获取用户行程详情失败:', result.error || '未知错误')
-        throw new Error(result.error || '行程不存在或您没有权限访问')
+        
+        // 如果是网络或连接问题，提供友好的错误提示
+        if (result.error && result.error.includes('连接') || result.error.includes('网络')) {
+          throw new Error('网络连接失败，请检查网络连接后重试')
+        } else {
+          throw new Error(result.error || '行程不存在或您没有权限访问')
+        }
       }
     } else {
       // 新建行程页面，显示空行程状态
@@ -550,8 +599,12 @@ const fetchPlanDetail = async () => {
     }
   } catch (err) {
     console.error('获取行程详情失败:', err)
-    error.value = '获取行程信息失败，请稍后重试'
-    // 不使用模拟数据，让用户看到真实的错误状态
+    error.value = err.message || '获取行程信息失败，请稍后重试'
+    
+    // 如果是网络问题，提供重试按钮
+    if (err.message.includes('网络') || err.message.includes('连接')) {
+      error.value += '。请检查网络连接后点击重试按钮。'
+    }
   } finally {
     loading.value = false
   }

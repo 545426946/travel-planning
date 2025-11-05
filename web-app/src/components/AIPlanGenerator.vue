@@ -214,6 +214,9 @@ const handleAIGenerate = async () => {
     await aiFormRef.value.validate()
     generating.value = true
     
+    // 显示等待提示
+    const loadingMessage = message.loading('AI正在为您生成规划，请稍后...', 0)
+    
     // 调用Mistral AI服务生成规划
     const plan = await mistralService.generateTravelPlan(aiForm.value)
     aiPlanResult.value = plan
@@ -221,9 +224,13 @@ const handleAIGenerate = async () => {
     showAIModal.value = false
     showResultModal.value = true
     
+    // 关闭等待提示并显示成功消息
+    loadingMessage()
     message.success('AI规划生成成功！')
   } catch (error) {
     console.error('AI规划生成失败:', error)
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     message.error('规划生成失败，请检查输入信息')
   } finally {
     generating.value = false
@@ -243,7 +250,8 @@ const saveAIPlan = async () => {
       return
     }
     
-    const saving = ref(true)
+    // 显示等待提示
+    const loadingMessage = message.loading('正在保存AI生成的行程，请稍后...', 0)
     
     // 准备保存数据
     const planData = {
@@ -260,6 +268,7 @@ const saveAIPlan = async () => {
     
     // 检查用户是否已登录
     if (!authService.isLoggedIn()) {
+      loadingMessage()
       throw new Error('请先登录后再保存行程')
     }
     
@@ -267,6 +276,7 @@ const saveAIPlan = async () => {
     const result = await supabaseAuthService.saveUserPlan(planData)
     
     if (!result.success) {
+      loadingMessage()
       throw new Error(result.error || '保存行程失败')
     }
     
@@ -322,6 +332,8 @@ const saveAIPlan = async () => {
     // 保存活动到用户专属数据库
     await supabaseAuthService.saveUserPlanActivities(savedPlan.id, activities)
     
+    // 关闭等待提示并显示成功消息
+    loadingMessage()
     message.success('行程保存成功')
     showResultModal.value = false
     
@@ -329,6 +341,8 @@ const saveAIPlan = async () => {
     router.push(`/plan/${savedPlan.id}`)
   } catch (error) {
     console.error('保存行程失败:', error)
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     message.error('保存行程失败，请重试')
   }
 }

@@ -46,7 +46,7 @@
                 </a-space>
                 <template #overlay>
                   <a-menu>
-                    <a-menu-item @click="logout">退出登录</a-menu-item>
+                    <a-menu-item @click="handleLogout">退出登录</a-menu-item>
                   </a-menu>
                 </template>
               </a-dropdown>
@@ -131,7 +131,26 @@ const showMobileMenu = ref(false)
 // 使用状态管理store
 const { authState, logout } = useAuthStore()
 
-// 计算属性
+// 退出登录函数
+const handleLogout = async () => {
+  try {
+    // 显示等待提示
+    const loadingMessage = message.loading('正在退出登录，请稍后...', 0)
+    
+    // 执行退出登录
+    await logout()
+    
+    // 关闭等待提示并显示成功消息
+    loadingMessage()
+    message.success('退出登录成功')
+  } catch (error) {
+    // 关闭等待提示并显示错误消息
+    message.destroy()
+    message.error('退出登录失败，请重试')
+  }
+}
+
+// 计算属性 - 使用只读方式访问
 const isLoggedIn = computed(() => authState.isLoggedIn)
 const currentUser = computed(() => authState.currentUser)
 

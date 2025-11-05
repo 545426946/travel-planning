@@ -164,8 +164,8 @@ const formatJoinDate = (dateString) => {
 }
 
 const viewPlan = (plan) => {
-  // 这里可以添加查看行程详情的逻辑
-  message.info(`查看行程: ${plan.title}`)
+  // 跳转到行程详情页面
+  router.push(`/plan/${plan.id}`)
 }
 
 const loadUserStats = async () => {

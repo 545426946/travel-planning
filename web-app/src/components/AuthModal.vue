@@ -196,11 +196,20 @@ const handleSubmit = async () => {
   
   try {
     if (isLoginMode.value) {
+      // 显示等待提示
+      const loadingMessage = message.loading('正在登录，请稍后...', 0)
+      
       // 登录逻辑
       await authService.login(formState.username, formState.password)
+      
+      // 关闭等待提示并显示成功消息
+      loadingMessage()
       message.success('登录成功！')
       emit('success', { mode: 'login', user: authService.getCurrentUser() })
     } else {
+      // 显示等待提示
+      const loadingMessage = message.loading('正在注册，请稍后...', 0)
+      
       // 注册逻辑
       await authService.register({
         username: formState.username,
@@ -209,6 +218,9 @@ const handleSubmit = async () => {
         email: formState.email,
         displayName: formState.displayName || formState.username
       })
+      
+      // 关闭等待提示并显示成功消息
+      loadingMessage()
       message.success('注册成功！')
       // 注册成功后自动切换到登录模式
       isLoginMode.value = true
@@ -220,6 +232,8 @@ const handleSubmit = async () => {
     // 登录成功，关闭弹窗
     visible.value = false
   } catch (error) {
+    // 关闭等待提示并显示错误消息
+    message.destroy()
     message.error(error.message || '操作失败')
   } finally {
     loading.value = false

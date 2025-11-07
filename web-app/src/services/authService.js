@@ -3,6 +3,8 @@ import { message } from 'ant-design-vue'
 
 class AuthService {
   constructor() {
+    // 恢复使用真正的Supabase
+    this.useLocalData = false
     this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
     this.supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
     this.currentUser = null
@@ -84,16 +86,29 @@ class AuthService {
       return false
     }
 
+    if (this.useLocalData) {
+      // 本地模拟验证
+      const storedUser = this.getStoredUser()
+      if (storedUser && this.sessionToken === 'local_session_' + storedUser.username) {
+        this.currentUser = storedUser
+        return true
+      } else {
+        this.logout()
+        return false
+      }
+    }
+
+    // 使用正确的会话验证函数
     try {
-      const response = await this.callSupabaseFunction('validate_session', {
-        session_token: this.sessionToken
+      const response = await this.callSupabaseFunction('validate_user_session', {
+        p_session_token: this.sessionToken
       })
 
-      if (response.data && response.data.length > 0 && response.data[0].is_valid) {
+      if (response && response.length > 0 && response[0].is_valid) {
         this.currentUser = {
-          id: response.data[0].user_id,
-          username: response.data[0].username,
-          displayName: response.data[0].display_name
+          id: response[0].id,
+          username: response[0].username,
+          displayName: response[0].display_name || response[0].username
         }
         this.setStoredUser(this.currentUser)
         return true
@@ -188,117 +203,23 @@ class AuthService {
       throw new Error('用户名和密码不能为空')
     }
 
-    try {
-      // 方法1: 尝试使用数据库函数
-      try {
-        const authResponse = await this.callSupabaseFunction('authenticate_user', {
-          p_username: username,
-          p_password: password
-        })
-
-        console.log('登录验证响应:', authResponse)
-
-        if (authResponse && authResponse.length > 0) {
-          const userData = authResponse[0]
-          
-          if (userData.is_valid) {
-            // 创建会话
-            const sessionResponse = await this.callSupabaseFunction('create_user_session', {
-              p_user_id: userData.user_id
-            })
-
-            console.log('会话创建响应:', sessionResponse)
-
-            if (sessionResponse && sessionResponse.length > 0) {
-              const sessionData = sessionResponse[0]
-              
-              this.sessionToken = sessionData.session_token
-              this.currentUser = {
-                id: userData.user_id,
-                username: userData.username,
-                displayName: userData.display_name
-              }
-              
-              // 存储会话和用户信息
-              this.setStoredSessionToken(this.sessionToken)
-              this.setStoredUser(this.currentUser)
-              
-              // 通知状态变化
-              this.notifyListeners()
-              
-              message.success(`欢迎回来，${userData.display_name || userData.username}！`)
-              return { success: true, user: this.currentUser }
-            }
-          }
-        }
-      } catch (funcError) {
-        console.warn('数据库函数调用失败，尝试直接查询:', funcError)
+    if (this.useLocalData) {
+      // 本地模拟登录（保留作为备用）
+      const mockUsers = {
+        'liu': { password: '123456', role: 'admin', displayName: '管理员刘' },
+        'admin': { password: 'admin123', role: 'admin', displayName: '系统管理员' },
+        'user': { password: '123456', role: 'user', displayName: '普通用户' }
       }
 
-      // 方法2: 使用数据库函数进行密码验证
-      try {
-        // 再次尝试使用数据库函数进行验证
-        const authResponse = await fetch(`${this.supabaseUrl}/rest/v1/rpc/authenticate_user`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': this.supabaseKey,
-            'Authorization': `Bearer ${this.supabaseKey}`,
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify({
-            p_username: username,
-            p_password: password
-          })
-        })
-
-        if (!authResponse.ok) {
-          throw new Error(`认证请求失败: ${authResponse.status}`)
-        }
-
-        const authData = await authResponse.json()
+      if (mockUsers[username] && mockUsers[username].password === password) {
+        const userData = mockUsers[username]
         
-        if (!authData || authData.length === 0) {
-          throw new Error('用户名或密码错误')
-        }
-
-        const userData = authData[0]
-        
-        if (!userData.is_valid) {
-          throw new Error('用户名或密码错误')
-        }
-
-        // 创建会话
-        const sessionResponse = await fetch(`${this.supabaseUrl}/rest/v1/rpc/create_user_session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': this.supabaseKey,
-            'Authorization': `Bearer ${this.supabaseKey}`,
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify({
-            p_user_id: userData.user_id
-          })
-        })
-
-        if (!sessionResponse.ok) {
-          throw new Error(`会话创建失败: ${sessionResponse.status}`)
-        }
-
-        const sessionData = await sessionResponse.json()
-        
-        if (!sessionData || sessionData.length === 0) {
-          throw new Error('会话创建失败')
-        }
-
-        const sessionInfo = sessionData[0]
-        
-        this.sessionToken = sessionInfo.session_token
+        this.sessionToken = 'local_session_' + username
         this.currentUser = {
-          id: userData.user_id,
-          username: userData.username,
-          displayName: userData.display_name || userData.username
+          id: 'local_' + username,
+          username: username,
+          displayName: userData.displayName,
+          role: userData.role
         }
         
         // 存储会话和用户信息
@@ -308,12 +229,59 @@ class AuthService {
         // 通知状态变化
         this.notifyListeners()
         
-        message.success(`欢迎回来，${this.currentUser.displayName}！`)
+        message.success(`欢迎回来，${userData.displayName}！`)
         return { success: true, user: this.currentUser }
+      } else {
+        throw new Error('用户名或密码错误')
+      }
+    }
+
+    try {
+      // 使用数据库函数进行认证
+      const authResponse = await this.callSupabaseFunction('authenticate_user', {
+        p_username: username,
+        p_password: password
+      })
+
+      console.log('登录验证响应:', authResponse)
+
+      if (authResponse && authResponse.length > 0) {
+        const userData = authResponse[0]
         
-      } catch (fallbackError) {
-        console.error('备用认证方法失败:', fallbackError)
-        throw new Error('认证服务暂时不可用，请稍后重试')
+        if (userData.is_valid) {
+          // 创建会话
+          const sessionResponse = await this.callSupabaseFunction('create_user_session', {
+            p_app_user_id: userData.id
+          })
+
+          console.log('会话创建响应:', sessionResponse)
+
+          if (sessionResponse && sessionResponse.length > 0) {
+            const sessionData = sessionResponse[0]
+            
+            this.sessionToken = sessionData.session_token
+            this.currentUser = {
+              id: userData.id,
+              username: userData.username,
+              displayName: userData.display_name || userData.username,
+              role: userData.role || 'user'
+            }
+            
+            // 存储会话和用户信息
+            this.setStoredSessionToken(this.sessionToken)
+            this.setStoredUser(this.currentUser)
+            
+            // 通知状态变化
+            this.notifyListeners()
+            
+            message.success(`欢迎回来，${this.currentUser.displayName}！`)
+            return { success: true, user: this.currentUser }
+          }
+        } else {
+          throw new Error('用户名或密码错误')
+        }
+      } else {
+        throw new Error('用户名或密码错误')
       }
       
     } catch (error) {
@@ -328,7 +296,18 @@ class AuthService {
   }
 
   // 用户登出
-  logout() {
+  async logout() {
+    // 清理服务器会话
+    if (this.sessionToken && !this.useLocalData) {
+      try {
+        await this.callSupabaseFunction('delete_user_session', {
+          p_session_token: this.sessionToken
+        })
+      } catch (error) {
+        console.error('清理服务器会话失败:', error)
+      }
+    }
+
     this.currentUser = null
     this.sessionToken = null
     this.setStoredSessionToken(null)
@@ -355,6 +334,11 @@ class AuthService {
   // 检查是否已登录
   isLoggedIn() {
     return !!this.currentUser && !!this.sessionToken
+  }
+
+  // 检查是否为管理员
+  isAdmin() {
+    return this.isLoggedIn() && this.currentUser.role === 'admin'
   }
 
   // 获取会话token（用于API调用）

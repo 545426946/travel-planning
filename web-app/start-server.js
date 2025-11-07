@@ -8,7 +8,7 @@ import os from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const port = 8080;
+const port = 8086;
 const mimeTypes = {
     '.html': 'text/html',
     '.css': 'text/css',
@@ -22,13 +22,20 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
-    // 处理根路径
-    let filePath = req.url === '/' ? '/index.html' : req.url;
-    filePath = path.join(__dirname, filePath);
+    // 处理前端路由 - 所有路由都返回index.html
+    let filePath;
     
-    // 获取文件扩展名
-    const extname = path.extname(filePath).toLowerCase();
-    const contentType = mimeTypes[extname] || 'application/octet-stream';
+    // 如果请求的是静态资源（css, js, images等），直接返回文件
+    const extname = path.extname(req.url).toLowerCase();
+    if (extname && mimeTypes[extname]) {
+        filePath = '/dist' + req.url;
+    } else {
+        // 所有其他路由（包括/admin）都返回index.html，由前端路由处理
+        filePath = '/dist/index.html';
+    }
+    
+    filePath = path.join(__dirname, filePath);
+    const contentType = mimeTypes[extname] || 'text/html';
     
     // 读取文件
     fs.readFile(filePath, (error, content) => {
@@ -61,7 +68,11 @@ const server = http.createServer((req, res) => {
             }
         } else {
             // 成功返回文件
-            res.writeHead(200, { 'Content-Type': contentType });
+            const headers = { 'Content-Type': contentType };
+            if (contentType === 'text/html' || contentType === 'text/css' || contentType === 'text/javascript') {
+                headers['Content-Type'] = contentType + '; charset=utf-8';
+            }
+            res.writeHead(200, headers);
             res.end(content, 'utf-8');
         }
     });

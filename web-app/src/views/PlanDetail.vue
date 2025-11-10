@@ -11,6 +11,12 @@
         <button @click="addNewActivity" class="edit-button">
           ➕ 添加活动
         </button>
+        <button @click="openMapView" class="map-button">
+          🗺️ 查看地图路线
+        </button>
+        <button @click="openAmapApp" class="amap-button">
+          📍 高德地图导航
+        </button>
         <button @click="toggleDebug" class="toggle-debug-button" title="切换调试模式">
           {{ showDebug ? '隐藏' : '显示' }}调试
         </button>

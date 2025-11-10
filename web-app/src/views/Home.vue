@@ -16,6 +16,10 @@
               <template #icon><CompassOutlined /></template>
               探索景点
             </a-button>
+            <a-button size="large" @click="$router.push('/map')">
+              <template #icon><EnvironmentOutlined /></template>
+              查看地图
+            </a-button>
           </div>
           <div v-if="!isLoggedIn" class="hero-login-tip">
             <a-typography-text type="secondary">

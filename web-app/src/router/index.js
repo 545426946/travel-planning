@@ -20,6 +20,12 @@ const routes = [
     component: Home 
   },
   { 
+    path: '/map', 
+    name: 'Map', 
+    component: () => import('../views/Map.vue'),
+    meta: { requiresAuth: true }
+  },
+  { 
     path: '/plans', 
     name: 'Plans', 
     component: Plans,
@@ -64,7 +70,13 @@ const routes = [
     name: 'AttractionManagement', 
     component: AttractionManagement,
     meta: { requiresAdmin: true }
-  }
+  },
+  { 
+    path: '/admin/plans', 
+    name: 'PlanManagement', 
+    component: () => import('../views/admin/PlanManagement.vue'),
+    meta: { requiresAdmin: true }
+  },
 ]
 
 const router = createRouter({

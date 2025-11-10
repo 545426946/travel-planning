@@ -127,25 +127,23 @@
       </a-col>
       
       <a-col :span="12">
-        <a-card title="最新景点" class="recent-card">
+        <a-card title="最近旅行规划" class="recent-card">
           <a-list
-            :data-source="recentAttractions"
+            :data-source="recentPlans"
             :loading="loading"
           >
             <template #renderItem="{ item }">
               <a-list-item>
                 <a-list-item-meta
-                  :title="item.name"
-                  :description="`位置: ${item.location}, ${item.country}`"
+                  :title="item.title"
+                  :description="`目的地: ${item.destination || '未指定'} | 创建时间: ${formatDate(item.created_at)}`"
                 >
                   <template #avatar>
-                    <a-avatar :src="item.image_url" :alt="item.name">
-                      <environment-outlined v-if="!item.image_url" />
-                    </a-avatar>
+                    <a-avatar>{{ item.title.charAt(0).toUpperCase() }}</a-avatar>
                   </template>
                 </a-list-item-meta>
                 <template #actions>
-                  <a-button type="link" size="small" @click="viewAttraction(item)">编辑</a-button>
+                  <a-button type="link" size="small" @click="viewPlan(item)">查看</a-button>
                 </template>
               </a-list-item>
             </template>
@@ -170,6 +168,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons-vue'
 import authService from '../../services/authService'
+import adminService from '../../services/adminService'
 
 const router = useRouter()
 const loading = ref(false)
@@ -182,43 +181,9 @@ const stats = ref({
 })
 
 const recentUsers = ref([])
-const recentAttractions = ref([])
+const recentPlans = ref([])
 
 const currentUser = computed(() => authService.getCurrentUser())
-
-// 模拟数据 - 实际项目中应该从API获取
-const mockStats = {
-  totalUsers: 1250,
-  totalAttractions: 85,
-  totalPlans: 320,
-  totalCities: 15
-}
-
-const mockRecentUsers = [
-  { id: 1, username: 'user001', created_at: new Date().toISOString() },
-  { id: 2, username: 'traveler2024', created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 3, username: 'explorer_001', created_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: 4, username: 'journey_lover', created_at: new Date(Date.now() - 259200000).toISOString() }
-]
-
-const mockRecentAttractions = [
-  { 
-    id: 1, 
-    name: '长城', 
-    location: '北京', 
-    country: '中国',
-    image_url: null,
-    created_at: new Date().toISOString() 
-  },
-  { 
-    id: 2, 
-    name: '埃菲尔铁塔', 
-    location: '巴黎', 
-    country: '法国',
-    image_url: null,
-    created_at: new Date(Date.now() - 86400000).toISOString() 
-  }
-]
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('zh-CN')
@@ -229,9 +194,9 @@ const viewUser = (user) => {
   // 实际项目中这里应该跳转到用户详情页面
 }
 
-const viewAttraction = (attraction) => {
-  message.info(`编辑景点: ${attraction.name}`)
-  // 实际项目中这里应该跳转到景点编辑页面
+const viewPlan = (plan) => {
+  message.info(`查看旅行规划: ${plan.title}`)
+  // 实际项目中这里应该跳转到规划详情页面
 }
 
 const handleSystemSettings = () => {
@@ -242,16 +207,49 @@ const loadDashboardData = async () => {
   loading.value = true
   
   try {
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 并行获取所有数据
+    const [statsData, recentUsersData, recentPlansData] = await Promise.all([
+      adminService.getDashboardStats(),
+      adminService.getRecentUsers(5),
+      adminService.getRecentPlans(5)
+    ])
     
-    // 实际项目中应该调用真实的API
-    stats.value = mockStats
-    recentUsers.value = mockRecentUsers
-    recentAttractions.value = mockRecentAttractions
+    // 更新数据
+    stats.value = statsData
+    recentUsers.value = recentUsersData
+    recentPlans.value = recentPlansData
     
   } catch (error) {
-    message.error('加载数据失败')
+    console.error('加载仪表板数据失败:', error)
+    message.error('加载数据失败，请检查网络连接')
+    
+    // 使用模拟数据作为备选方案
+    stats.value = {
+      totalUsers: 23,
+      totalAttractions: 7,
+      totalPlans: 32,
+      totalCities: 0
+    }
+    recentUsers.value = [
+      {
+        id: '1',
+        username: 'user001',
+        displayName: '用户001',
+        email: 'user001@example.com',
+        role: 'user',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true
+      }
+    ]
+    recentPlans.value = [
+      {
+        id: '1',
+        title: '北京三日游',
+        destination: '北京',
+        createdAt: new Date().toISOString()
+      }
+    ]
   } finally {
     loading.value = false
   }

@@ -110,10 +110,7 @@
           </div>
           
           <div class="destination-actions">
-            <a-button type="primary" @click.stop="addToPlan(destination)">
-              规划行程
-            </a-button>
-            <a-button @click.stop="viewDetails(destination)">
+            <a-button type="primary" @click.stop="viewDetails(destination)">
               详情
             </a-button>
           </div>
@@ -494,14 +491,6 @@ const resetFilters = () => {
 const viewDestination = (destination) => {
   selectedDestination.value = destination
   detailModalVisible.value = true
-}
-
-const addToPlan = (destination) => {
-  message.success(`已将 ${destination.name} 添加到行程规划`)
-  // 这里可以添加实际添加到行程的逻辑
-  window.dispatchEvent(new CustomEvent('openAuthModal', {
-    detail: { mode: 'login' }
-  }))
 }
 
 const viewDetails = (destination) => {

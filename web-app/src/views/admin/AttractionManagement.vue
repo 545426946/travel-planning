@@ -2,8 +2,8 @@
   <AdminLayout>
     <div class="attraction-management">
       <div class="page-header">
-        <h1>景点管理</h1>
-        <p>管理系统景点信息，包括添加、编辑和删除操作</p>
+        <h1>热门景点管理</h1>
+        <p>基于用户旅行规划显示热门景点，支持查看和分析景点热度</p>
       </div>
 
       <!-- 搜索和筛选 -->
@@ -49,49 +49,105 @@
         </a-form>
       </a-card>
 
-      <!-- 景点列表 -->
+      <!-- 热门景点统计卡片 -->
+      <a-row :gutter="16" class="stats-row">
+        <a-col :span="6">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-icon popularity-icon">
+                <star-outlined />
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stats.totalPopularAttractions || 0 }}</div>
+                <div class="stat-label">热门景点数</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+        
+        <a-col :span="6">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-icon plans-icon">
+                <calendar-outlined />
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stats.totalPlans || 0 }}</div>
+                <div class="stat-label">涉及行程数</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+        
+        <a-col :span="6">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-icon users-icon">
+                <user-outlined />
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stats.totalUsers || 0 }}</div>
+                <div class="stat-label">相关用户数</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+        
+        <a-col :span="6">
+          <a-card class="stat-card">
+            <div class="stat-content">
+              <div class="stat-icon cities-icon">
+                <environment-outlined />
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stats.totalDestinations || 0 }}</div>
+                <div class="stat-label">目的地城市</div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+
+      <!-- 热门景点列表 -->
       <a-card class="attractions-card">
         <template #extra>
-          <a-button type="primary" @click="showAddModal">
-            <template #icon><plus-outlined /></template>
-            添加景点
+          <a-button type="primary" @click="refreshData">
+            <template #icon><reload-outlined /></template>
+            刷新数据
           </a-button>
         </template>
 
         <a-table
           :columns="columns"
-          :data-source="attractions"
+          :data-source="popularAttractions"
           :loading="loading"
           :pagination="pagination"
           @change="handleTableChange"
-          row-key="id"
+          row-key="location"
         >
+          <template #popularity="{ record }">
+            <a-progress 
+              :percent="Math.min(100, (record.popularity / maxPopularity) * 100)" 
+              :stroke-color="getPopularityColor(record.popularity)"
+              :format="() => `${record.popularity}次`"
+            />
+          </template>
+
           <template #type="{ record }">
             <a-tag :color="getTypeColor(record.type)">
               {{ record.type }}
             </a-tag>
           </template>
 
-          <template #entryFee="{ record }">
-            {{ record.priceRange ? record.priceRange : '免费' }}
-          </template>
-
           <template #rating="{ record }">
-            <a-rate :value="record.rating" disabled />
-            <span style="margin-left: 8px; color: #ffc53d">{{ record.rating }}</span>
-          </template>
-
-          <template #createdAt="{ record }">
-            {{ formatDate(record.created_at) }}
+            <a-rate :value="record.avgRating" disabled />
+            <span style="margin-left: 8px; color: #ffc53d">{{ record.avgRating.toFixed(1) }}</span>
           </template>
 
           <template #action="{ record }">
             <a-space>
-              <a-button size="small" @click="viewAttraction(record)">查看</a-button>
-              <a-button size="small" @click="editAttraction(record)">编辑</a-button>
-              <a-button size="small" danger @click="deleteAttraction(record)">
-                删除
-              </a-button>
+              <a-button size="small" @click="viewAttractionDetails(record)">详情</a-button>
+              <a-button size="small" @click="showRelatedPlans(record)">相关行程</a-button>
             </a-space>
           </template>
         </a-table>
@@ -254,7 +310,14 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { 
+  SearchOutlined, 
+  ReloadOutlined,
+  StarOutlined,
+  CalendarOutlined,
+  UserOutlined,
+  EnvironmentOutlined 
+} from '@ant-design/icons-vue'
 import adminService from '../../services/adminService'
 
 // 表格列配置
@@ -272,49 +335,44 @@ const columns = [
     width: 120
   },
   {
-    title: '国家',
-    dataIndex: 'country',
-    key: 'country',
-    width: 100
+    title: '热门度',
+    dataIndex: 'popularity',
+    key: 'popularity',
+    width: 120,
+    slots: { customRender: 'popularity' }
   },
   {
     title: '类型',
     dataIndex: 'type',
     key: 'type',
-    width: 120,
+    width: 100,
     slots: { customRender: 'type' }
   },
   {
-    title: '门票价格',
-    dataIndex: 'entry_fee',
-    key: 'entry_fee',
-    width: 100
-  },
-  {
-    title: '评分',
-    dataIndex: 'rating',
-    key: 'rating',
-    width: 150,
+    title: '平均评分',
+    dataIndex: 'avgRating',
+    key: 'avgRating',
+    width: 120,
     slots: { customRender: 'rating' }
   },
   {
-    title: '创建时间',
-    dataIndex: 'created_at',
-    key: 'created_at',
-    width: 150,
-    slots: { customRender: 'createdAt' }
+    title: '涉及行程数',
+    dataIndex: 'planCount',
+    key: 'planCount',
+    width: 100
   },
   {
     title: '操作',
     key: 'action',
-    width: 200,
+    width: 180,
     slots: { customRender: 'action' }
   }
 ]
 
 const loading = ref(false)
-const attractions = ref([])
-const selectedAttraction = ref(null)
+const popularAttractions = ref([])
+const stats = ref({})
+const maxPopularity = ref(1)
 
 // 搜索表单
 const searchForm = reactive({
@@ -399,52 +457,97 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('zh-CN')
 }
 
-const loadAttractions = async () => {
+// 获取热门度颜色
+const getPopularityColor = (popularity) => {
+  if (popularity >= 20) return '#ff4d4f'
+  if (popularity >= 10) return '#ff7a45'
+  if (popularity >= 5) return '#ffa940'
+  return '#ffc53d'
+}
+
+// 热门景点详情视图
+const selectedAttraction = ref(null)
+
+const viewAttractionDetails = (record) => {
+  selectedAttraction.value = record
+  detailModal.visible = true
+}
+
+const showRelatedPlans = (record) => {
+  message.info(`查看与"${record.name}"相关的行程`)
+  // 实际项目中这里应该跳转到相关行程页面
+}
+
+const refreshData = async () => {
+  await loadPopularAttractions()
+}
+
+const loadPopularAttractions = async () => {
   loading.value = true
   
   try {
-    // 调用管理员服务获取景点列表
-    const allAttractions = await adminService.getAllAttractions()
+    // 调用管理员服务获取热门景点统计数据
+    const data = await adminService.getPopularAttractionsStats()
+    
+    // 更新统计数据
+    stats.value = data.stats
+    popularAttractions.value = data.popularAttractions
+    
+    // 计算最大热门度用于进度条显示
+    if (popularAttractions.value.length > 0) {
+      maxPopularity.value = Math.max(...popularAttractions.value.map(a => a.popularity))
+    }
     
     // 应用搜索过滤
-    let filteredAttractions = allAttractions
-    
-    if (searchForm.name) {
-      filteredAttractions = filteredAttractions.filter(attraction => 
-        attraction.name && attraction.name.includes(searchForm.name)
-      )
-    }
-    
-    if (searchForm.location) {
-      filteredAttractions = filteredAttractions.filter(attraction => 
-        attraction.location && attraction.location.includes(searchForm.location)
-      )
-    }
-    
-    if (searchForm.type) {
-      filteredAttractions = filteredAttractions.filter(attraction => 
-        attraction.type === searchForm.type
-      )
-    }
-    
-    attractions.value = filteredAttractions
-    pagination.total = filteredAttractions.length
+    applySearchFilter()
     
   } catch (error) {
-    console.error('加载景点数据失败:', error)
-    message.error('加载景点数据失败')
+    console.error('加载热门景点数据失败:', error)
+    message.error('加载热门景点数据失败')
     
-    // 如果API调用失败，使用空数组
-    attractions.value = []
+    // 使用默认数据作为备选方案
+    stats.value = {
+      totalPopularAttractions: 0,
+      totalPlans: 0,
+      totalUsers: 0,
+      totalDestinations: 0
+    }
+    popularAttractions.value = []
     pagination.total = 0
   } finally {
     loading.value = false
   }
 }
 
+// 应用搜索过滤
+const applySearchFilter = () => {
+  let filteredAttractions = popularAttractions.value
+  
+  if (searchForm.name) {
+    filteredAttractions = filteredAttractions.filter(attraction => 
+      attraction.name && attraction.name.toLowerCase().includes(searchForm.name.toLowerCase())
+    )
+  }
+  
+  if (searchForm.location) {
+    filteredAttractions = filteredAttractions.filter(attraction => 
+      attraction.location && attraction.location.toLowerCase().includes(searchForm.location.toLowerCase())
+    )
+  }
+  
+  if (searchForm.type) {
+    filteredAttractions = filteredAttractions.filter(attraction => 
+      attraction.type === searchForm.type
+    )
+  }
+  
+  popularAttractions.value = filteredAttractions
+  pagination.total = filteredAttractions.length
+}
+
 const handleSearch = () => {
   pagination.current = 1
-  loadAttractions()
+  applySearchFilter()
 }
 
 const resetSearch = () => {
@@ -452,12 +555,11 @@ const resetSearch = () => {
     searchForm[key] = ''
   })
   pagination.current = 1
-  loadAttractions()
+  loadPopularAttractions()
 }
 
 const handleTableChange = (newPagination) => {
   Object.assign(pagination, newPagination)
-  loadAttractions()
 }
 
 const showAddModal = () => {
@@ -575,7 +677,7 @@ const handleAttractionCancel = () => {
 }
 
 onMounted(() => {
-  loadAttractions()
+  loadPopularAttractions()
 })
 </script>
 

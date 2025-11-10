@@ -48,11 +48,13 @@ class AdminService {
   }
 
   // 管理员登录
-  async adminLogin(username, password) {
+  async adminLogin(email, password) {
     try {
       if (!this.supabaseUrl || !this.supabaseKey) {
         throw new Error('数据库连接配置缺失')
       }
+
+      console.log('开始管理员登录认证:', { email, supabaseUrl: this.supabaseUrl })
 
       // 首先验证用户凭据
       const authResponse = await fetch(`${this.supabaseUrl}/rest/v1/rpc/authenticate_user`, {
@@ -64,52 +66,45 @@ class AdminService {
           'Prefer': 'return=representation'
         },
         body: JSON.stringify({
-          p_username: username,
+          p_email: email,
           p_password: password
         })
       })
 
+      console.log('认证响应状态:', authResponse.status)
+
       if (!authResponse.ok) {
-        throw new Error('认证请求失败')
+        const errorText = await authResponse.text()
+        console.error('认证请求失败:', errorText)
+        throw new Error(`认证请求失败: ${authResponse.status}`)
       }
 
       const authData = await authResponse.json()
+      console.log('认证返回数据:', authData)
       
       if (!authData || authData.length === 0) {
         throw new Error('用户名或密码错误')
       }
 
       const userData = authData[0]
+      console.log('用户数据:', userData)
       
-      if (!userData.is_valid) {
-        throw new Error('用户名或密码错误')
+      // 检查用户是否激活
+      if (!userData.is_active) {
+        throw new Error('用户账户已被禁用')
       }
 
       // 检查用户是否为管理员
-      const adminCheckResponse = await fetch(`${this.supabaseUrl}/rest/v1/app_users?id=eq.${userData.id}&select=role`, {
-        method: 'GET',
-        headers: {
-          'apikey': this.supabaseKey,
-          'Authorization': `Bearer ${this.supabaseKey}`
-        }
-      })
-
-      if (!adminCheckResponse.ok) {
-        throw new Error('无法验证用户权限')
-      }
-
-      const adminData = await adminCheckResponse.json()
-      
-      if (!adminData || adminData.length === 0 || adminData[0].role !== 'admin') {
+      if (userData.role !== 'admin') {
         throw new Error('权限不足：需要管理员权限')
       }
 
       // 登录成功，存储管理员信息到本地存储
       const adminInfo = {
-        id: userData.id,
-        username: username,
-        email: userData.email || `${username}@travelplanner.com`,
-        role: 'admin',
+        id: userData.user_id || userData.id,
+        username: userData.username,
+        email: userData.email,
+        role: userData.role,
         isAdmin: true
       }
       
@@ -126,19 +121,19 @@ class AdminService {
         
         // 模拟管理员账户
         const mockAdmins = [
-          { username: 'admin', password: 'admin123' },
-          { username: 'manager', password: 'admin123' }
+          { email: 'admin@example.com', password: 'admin123' },
+          { email: 'manager@example.com', password: 'admin123' }
         ]
         
         const matchedAdmin = mockAdmins.find(admin => 
-          admin.username === username && admin.password === password
+          admin.email === email && admin.password === password
         )
         
         if (matchedAdmin) {
           const adminInfo = {
             id: Date.now(),
-            username: username,
-            email: `${username}@travelplanner.com`,
+            username: email.split('@')[0],
+            email: email,
             role: 'admin',
             isAdmin: true
           }

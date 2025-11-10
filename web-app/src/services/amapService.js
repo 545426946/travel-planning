@@ -13,11 +13,140 @@ class AmapService {
         return
       }
 
+      // 检查API密钥是否有效
+      if (!this.apiKey || this.apiKey === '9b2a0f8e3c5d7e9f1a3b5c7d9e1f3a5b7d9f1a3b' || this.apiKey === 'test-mode') {
+        console.warn('高德地图API密钥无效或为测试模式，地图功能将受限')
+        // 返回一个更完整的模拟AMap对象，允许应用继续运行
+        const mockAMap = {
+          Map: class MockMap {
+            constructor(container, options) {
+              console.log('模拟地图创建成功', container, options)
+              this.container = container
+              this.options = options
+              // 添加容器样式
+              if (container) {
+                container.style.backgroundColor = '#f0f2f5'
+                container.style.position = 'relative'
+                container.style.minHeight = '400px'
+                
+                // 添加模拟地图内容
+                const mapContent = document.createElement('div')
+                mapContent.innerHTML = `
+                  <div style="padding: 20px; text-align: center; color: #666;">
+                    <h3>地图模拟模式</h3>
+                    <p>当前为测试模式，地图功能受限</p>
+                    <p>请配置真实的高德地图API密钥以使用完整功能</p>
+                    <div style="margin-top: 20px;">
+                      <button onclick="alert('请在.env文件中配置真实的高德地图API密钥')" style="padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        查看配置指南
+                      </button>
+                    </div>
+                  </div>
+                `
+                container.appendChild(mapContent)
+              }
+            }
+            addControl(control) {
+              console.log('添加地图控件:', control)
+              return this
+            }
+            on(event, callback) {
+              console.log('地图事件监听:', event)
+              return this
+            }
+            setMapStyle(style) {
+              console.log('设置地图样式:', style)
+              return this
+            }
+            setZoom(zoom) {
+              console.log('设置缩放级别:', zoom)
+              return this
+            }
+            setCenter(center) {
+              console.log('设置中心点:', center)
+              return this
+            }
+          },
+          
+          Marker: class MockMarker {
+            constructor(options) {
+              console.log('模拟标记创建成功', options)
+            }
+            setMap(map) {
+              console.log('标记设置地图:', map)
+              return this
+            }
+          },
+          
+          Polyline: class MockPolyline {
+            constructor(options) {
+              console.log('模拟路径创建成功', options)
+            }
+            setMap(map) {
+              console.log('路径设置地图:', map)
+              return this
+            }
+          },
+          
+          ToolBar: class MockToolBar {
+            constructor(options) {
+              console.log('工具栏控件创建成功', options)
+              this.options = options
+            }
+          },
+          
+          Scale: class MockScale {
+            constructor(options) {
+              console.log('比例尺控件创建成功', options)
+              this.options = options
+            }
+          },
+          
+          HawkEye: class MockHawkEye {
+            constructor(options) {
+              console.log('鹰眼控件创建成功', options)
+              this.options = options
+            }
+          },
+          
+          // 添加可能需要的其他类
+          Pixel: class MockPixel {
+            constructor(x, y) {
+              this.x = x
+              this.y = y
+            }
+          },
+          
+          LngLat: class MockLngLat {
+            constructor(lng, lat) {
+              this.lng = lng
+              this.lat = lat
+            }
+          }
+        }
+        
+        // 延迟返回以模拟异步加载
+        setTimeout(() => {
+          window.AMap = mockAMap
+          resolve(mockAMap)
+        }, 500)
+        return
+      }
+
       const script = document.createElement('script')
       script.src = `https://webapi.amap.com/maps?v=2.0&key=${this.apiKey}&plugin=AMap.Driving,AMap.Transfer,AMap.Walking,AMap.Riding,AMap.Geocoder,AMap.Autocomplete,AMap.PlaceSearch,AMap.MarkerClusterer`
       script.async = true
-      script.onload = () => resolve(window.AMap)
-      script.onerror = reject
+      script.onload = () => {
+        if (window.AMap) {
+          resolve(window.AMap)
+        } else {
+          reject(new Error('高德地图脚本加载失败'))
+        }
+      }
+      script.onerror = (error) => {
+        console.error('高德地图脚本加载错误:', error)
+        reject(new Error('高德地图API配置错误，请检查网络连接和API密钥'))
+      }
       
       document.head.appendChild(script)
     })

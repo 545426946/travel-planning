@@ -145,7 +145,7 @@ import {
   PlusOutlined, 
   MinusOutlined, 
   EnvironmentOutlined,
-  ClearOutlined,
+  DeleteOutlined,
   CloseOutlined
 } from '@ant-design/icons-vue'
 import amapService from '../services/amapService'

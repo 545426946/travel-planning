@@ -8,7 +8,7 @@
       <template #extra>
         <a-space>
           <a-button type="primary" @click="showRoutePanel = true">
-            <template #icon><route-outlined /></template>
+            <template #icon><EnvironmentOutlined /></template>
             路线规划
           </a-button>
           <a-button @click="refreshMap">
@@ -16,7 +16,7 @@
             刷新地图
           </a-button>
           <a-button v-if="isPlanRoute" @click="clearPlanRoute" type="dashed">
-            <template #icon><clear-outlined /></template>
+            <template #icon><DeleteOutlined /></template>
             清除行程路线
           </a-button>
         </a-space>
@@ -90,7 +90,7 @@
               <a-input
                 v-model:value="routeOrigin"
                 placeholder="请输入起点地址"
-                :suffix="originMarker ? <check-circle-outlined style="color: #52c41a" /> : null"
+                :suffix="originMarker ? '✅' : null"
               />
             </a-form-item>
             
@@ -98,7 +98,7 @@
               <a-input
                 v-model:value="routeDestination"
                 placeholder="请输入终点地址"
-                :suffix="destinationMarker ? <check-circle-outlined style="color: #52c41a" /> : null"
+                :suffix="destinationMarker ? '✅' : null"
               />
             </a-form-item>
             
@@ -190,20 +190,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import AmapMap from '../components/AmapMap.vue'
 import amapService from '../services/amapService'
 import { 
-  RouteOutlined, 
   ReloadOutlined, 
   PlusOutlined, 
   EnvironmentOutlined,
   FlagOutlined,
-  CheckCircleOutlined,
-  DeleteOutlined,
-  ClearOutlined
+  DeleteOutlined
 } from '@ant-design/icons-vue'
 
 // 路由引用
@@ -338,7 +335,7 @@ const clearPlanRoute = () => {
 
 // 加载行程路线
 const loadPlanRoute = async () => {
-  const { planId, locations, planTitle } = route.query
+  const { locations, planTitle } = route.query
   
   if (!locations) return
   

@@ -181,6 +181,9 @@ const handleRedirectToHome = () => {
 }
 
 onMounted(() => {
+  // 应用启动时尝试恢复登录状态
+  console.log('应用启动，检查登录状态...')
+  
   // 监听来自子组件的打开登录模态框事件
   window.addEventListener('openAuthModal', (event) => {
     openAuthModal(event.detail.mode || 'login')

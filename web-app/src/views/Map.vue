@@ -271,9 +271,14 @@ const handleMapClick = (point) => {
 }
 
 // 处理地图准备完成
-const handleMapReady = (mapInstance) => {
+const handleMapReady = async (mapInstance) => {
   console.log('地图加载完成:', mapInstance)
   mapReady.value = true
+  
+  // 如果是行程路线模式，绘制路线
+  if (isPlanRoute.value && planLocations.value.length > 1) {
+    await drawRoutePlan(mapInstance)
+  }
   
   // 初始化景点标记
   updateMarkers()
@@ -310,12 +315,86 @@ const viewMoreInfo = () => {
   }
 }
 
+// 绘制行程路线
+const drawRoutePlan = async (mapInstance) => {
+  try {
+    if (!mapInstance) return
+    
+    // 导入地图服务
+    const mapService = await import('../services/mapService.js')
+    
+    // 使用地图服务创建路线计划
+    const routePlan = await mapService.default.createRoutePlan(mapInstance, planLocations.value, {
+      city: '全国',
+      startTitle: '行程起点',
+      endTitle: '行程终点',
+      waypointTitle: '途经点'
+    })
+    
+    if (routePlan) {
+      console.log('路线计划创建成功:', routePlan)
+      message.success(`行程路线绘制成功，包含 ${routePlan.points.length} 个地点`)
+      
+      // 更新标记点显示
+      if (routePlan.markers && routePlan.markers.length > 0) {
+        markers.value = routePlan.markers.map((marker, index) => {
+          const position = [marker.getPosition().lng, marker.getPosition().lat]
+          const locationName = planLocations.value[index] || `地点${index + 1}`
+          
+          return {
+            id: `plan-${index}`,
+            name: `${index + 1}. ${locationName}`,
+            type: 'plan',
+            description: index === 0 ? '行程起点' : 
+                        index === routePlan.markers.length - 1 ? '行程终点' : '途经点',
+            position: position,
+            city: '行程路线',
+            country: '中国'
+          }
+        })
+      }
+    } else {
+      message.warning('路线绘制失败，将显示为标记点')
+      // 降级处理：只显示标记点
+      markers.value = planLocations.value.map((location, index) => ({
+        id: `plan-${index}`,
+        name: `${index + 1}. ${location}`,
+        type: 'plan',
+        description: index === 0 ? '行程起点' : 
+                    index === planLocations.value.length - 1 ? '行程终点' : '途经点',
+        position: mapCenter.value, // 使用地图中心点作为默认位置
+        city: '行程路线',
+        country: '中国'
+      }))
+    }
+  } catch (error) {
+    console.error('绘制路线计划失败:', error)
+    message.error('路线绘制失败，请检查网络连接')
+    
+    // 降级处理：只显示标记点
+    markers.value = planLocations.value.map((location, index) => ({
+      id: `plan-${index}`,
+      name: `${index + 1}. ${location}`,
+      type: 'plan',
+      description: index === 0 ? '行程起点' : 
+                  index === planLocations.value.length - 1 ? '行程终点' : '途经点',
+      position: mapCenter.value, // 使用地图中心点作为默认位置
+      city: '行程路线',
+      country: '中国'
+    }))
+  }
+}
+
 // 清除行程路线
 const clearPlanRoute = () => {
   planLocations.value = []
   isPlanRoute.value = false
   planTitle.value = ''
   markers.value = []
+  
+  // 重新加载默认景点数据
+  updateMarkers()
+  
   message.success('行程路线已清除')
 }
 
@@ -484,9 +563,23 @@ onMounted(() => {
   flex-direction: column;
 }
 
+/* 固定导航栏样式 */
+:deep(.ant-page-header) {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .map-content {
   flex: 1;
   position: relative;
+  margin-top: 80px; /* 为固定导航栏留出空间 */
+  height: calc(100vh - 80px); /* 减去导航栏高度 */
 }
 
 .place-details {
@@ -501,5 +594,13 @@ onMounted(() => {
 
 .filter-panel {
   padding: 16px 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .map-content {
+    margin-top: 100px; /* 移动端导航栏可能更高 */
+    height: calc(100vh - 100px);
+  }
 }
 </style>

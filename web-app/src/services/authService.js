@@ -81,6 +81,17 @@ class AuthService {
 
   // 验证当前会话
   async validateCurrentSession() {
+    // 首先尝试从本地存储恢复会话
+    const storedToken = this.getStoredSessionToken()
+    const storedUser = this.getStoredUser()
+    
+    // 如果有存储的会话信息，优先使用
+    if (storedToken && storedUser) {
+      this.sessionToken = storedToken
+      this.currentUser = storedUser
+      console.log('从本地存储恢复会话:', storedUser.username)
+    }
+
     if (!this.sessionToken) {
       this.currentUser = null
       return false
@@ -88,11 +99,12 @@ class AuthService {
 
     if (this.useLocalData) {
       // 本地模拟验证
-      const storedUser = this.getStoredUser()
       if (storedUser && this.sessionToken === 'local_session_' + storedUser.username) {
         this.currentUser = storedUser
+        console.log('本地会话验证成功')
         return true
       } else {
+        console.log('本地会话验证失败，执行登出')
         this.logout()
         return false
       }
@@ -108,18 +120,29 @@ class AuthService {
         this.currentUser = {
           id: response[0].id,
           username: response[0].username,
-          displayName: response[0].display_name || response[0].username
+          displayName: response[0].display_name || response[0].username,
+          role: response[0].role || 'user'
         }
         this.setStoredUser(this.currentUser)
+        console.log('服务器会话验证成功')
         return true
       } else {
+        console.log('服务器会话验证失败，执行登出')
         this.logout()
         return false
       }
     } catch (error) {
       console.error('会话验证失败:', error)
-      this.logout()
-      return false
+      // 网络错误时，如果本地有存储的用户信息，尝试保持登录状态
+      if (storedUser && storedToken) {
+        console.log('网络错误，使用本地存储保持登录状态')
+        this.currentUser = storedUser
+        this.sessionToken = storedToken
+        return true
+      } else {
+        this.logout()
+        return false
+      }
     }
   }
 

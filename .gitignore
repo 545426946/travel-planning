@@ -61,3 +61,23 @@ cloudfunctions/
 
 # 云存储本地文件
 miniprogram/storage/
+
+# 项目特定忽略文件
+mysql-installer.exe
+.codebuddy/
+
+# web-app 项目忽略文件
+web-app/node_modules/
+web-app/dist/
+web-app/build/
+web-app/.env
+
+# 项目特定忽略文件
+mysql-installer.exe
+.codebuddy/
+
+# web-app 项目忽略文件
+web-app/node_modules/
+web-app/dist/
+web-app/build/
+web-app/.env

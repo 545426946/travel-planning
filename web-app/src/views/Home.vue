@@ -62,36 +62,7 @@
       </a-row>
     </div>
 
-    <!-- 精选模板 -->
-    <div class="section">
-      <h2 class="section-title">精选行程模板</h2>
-      <a-row :gutter="[24, 24]">
-        <a-col :xs="24" :sm="12" :lg="8" v-for="template in templates" :key="template.id">
-          <a-card hoverable class="template-card">
-            <a-card-meta
-              :title="template.title"
-              :description="template.description"
-            >
-              <template #avatar>
-                <div class="template-icon">
-                  <component :is="getTemplateIcon(template.title)" />
-                </div>
-              </template>
-            </a-card-meta>
-            <div class="template-meta">
-              <a-space>
-                <span><CalendarOutlined /> {{ template.days }}天</span>
-                <span><DollarOutlined /> ¥{{ template.budget }}</span>
-                <span><StarOutlined /> {{ template.rating }}</span>
-              </a-space>
-            </div>
-            <a-button type="primary" block class="use-template-btn">
-              使用模板
-            </a-button>
-          </a-card>
-        </a-col>
-      </a-row>
-    </div>
+
 
     <!-- 地图预览 -->
     <div class="section">
@@ -161,7 +132,7 @@ const isLoggedIn = computed(() => authState.isLoggedIn)
 const currentUser = computed(() => authState.currentUser)
 
 const destinations = ref([])
-const templates = ref([])
+
 
 // 地图相关变量 - 现在只用于预览，完整地图在Map页面中
 
@@ -364,15 +335,7 @@ const getCityIcon = (cityName) => {
   return iconMap[cityName] || BankOutlined
 }
 
-// 获取模板图标 - 使用更美观且符合模板特色的图标
-const getTemplateIcon = (templateTitle) => {
-  // 根据标题中的关键词匹配图标
-  if (templateTitle.includes('北京')) return BankOutlined        // 历史文化模板
-  if (templateTitle.includes('上海')) return RocketOutlined      // 现代都市模板
-  if (templateTitle.includes('杭州')) return HeartOutlined      // 浪漫休闲模板
-  
-  return BankOutlined
-}
+
 
 const handleStartPlanning = () => {
   if (isLoggedIn.value) {
@@ -406,35 +369,7 @@ onMounted(() => {
   // 随机抽取4个热门目的地
   destinations.value = getRandomDestinations()
 
-  templates.value = [
-    {
-      id: 1,
-      title: '北京3日文化游',
-      description: '故宫、长城、颐和园经典路线',
-      icon: '🏯',
-      days: 3,
-      budget: 900,
-      rating: 4.8
-    },
-    {
-      id: 2,
-      title: '上海2日现代游',
-      description: '外滩、迪士尼、陆家嘴',
-      icon: '🏙️',
-      days: 2,
-      budget: 800,
-      rating: 4.6
-    },
-    {
-      id: 3,
-      title: '杭州西湖休闲游',
-      description: '西湖、灵隐寺、龙井茶园',
-      icon: '🏞️',
-      days: 2,
-      budget: 500,
-      rating: 4.9
-    }
-  ]
+
 })
 
 // 组件卸载时移除监听器
@@ -515,10 +450,6 @@ onUnmounted(() => {
   margin: 16px 0;
 }
 
-.use-template-btn {
-  margin-top: 16px;
-}
-
 /* 城市图标样式 */
 .city-icon {
   display: flex;
@@ -535,26 +466,6 @@ onUnmounted(() => {
 }
 
 .city-icon:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-/* 模板图标样式 */
-.template-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #fa8c16, #f5222d);
-  color: white;
-  font-size: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
-}
-
-.template-icon:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
@@ -656,8 +567,7 @@ onUnmounted(() => {
     flex-direction: column;
   }
   
-  .city-icon,
-  .template-icon {
+  .city-icon {
     width: 32px;
     height: 32px;
     font-size: 16px;

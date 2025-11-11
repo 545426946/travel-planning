@@ -616,6 +616,77 @@ const fetchPlanDetail = async () => {
   }
 }
 
+// 打开地图视图
+const openMapView = () => {
+  if (!plan.value.id || plan.value.id === 'new') {
+    alert('请先保存行程，再查看地图路线')
+    return
+  }
+  
+  if (!plan.value.activities || plan.value.activities.length === 0) {
+    alert('当前行程还没有添加活动，请先添加活动再查看地图路线')
+    return
+  }
+  
+  // 提取活动地点信息 - 使用真实的活动数据
+  const locations = plan.value.activities
+    .filter(activity => activity.location && activity.location.trim() !== '')
+    .map(activity => activity.location)
+    .filter((location, index, array) => array.indexOf(location) === index) // 去重
+  
+  if (locations.length === 0) {
+    alert('当前行程中的活动没有指定地点，请先为活动添加地点信息')
+    return
+  }
+  
+  console.log('传递到地图页面的真实地点数据:', {
+    行程名称: plan.value.title,
+    总天数: plan.value.days,
+    活动数量: plan.value.activities.length,
+    有效地点数量: locations.length,
+    地点列表: locations
+  })
+  
+  // 跳转到地图页面，并传递真实行程路线信息
+  router.push({
+    path: '/map',
+    query: {
+      locations: locations.join('|'),
+      planTitle: plan.value.title,
+      planId: plan.value.id,
+      isRealPlan: 'true' // 标记为真实行程
+    }
+  })
+}
+
+// 打开高德地图导航
+const openAmapApp = () => {
+  if (!plan.value.id || plan.value.id === 'new') {
+    alert('请先保存行程，再使用导航功能')
+    return
+  }
+  
+  if (!plan.value.activities || plan.value.activities.length === 0) {
+    alert('当前行程还没有添加活动，请先添加活动再使用导航功能')
+    return
+  }
+  
+  // 获取第一个活动地点作为导航起点
+  const firstActivity = plan.value.activities.find(activity => activity.location && activity.location.trim() !== '')
+  
+  if (!firstActivity) {
+    alert('当前行程中的活动没有指定地点，请先为活动添加地点信息')
+    return
+  }
+  
+  // 构建高德地图导航链接
+  const destination = encodeURIComponent(firstActivity.location)
+  const amapUrl = `https://uri.amap.com/navigation?destination=${destination}&callnative=1`
+  
+  // 打开高德地图App或网页版
+  window.open(amapUrl, '_blank')
+}
+
 // 生命周期
 onMounted(() => {
   console.log('行程详情页面加载成功')

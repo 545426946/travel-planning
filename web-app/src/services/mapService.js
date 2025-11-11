@@ -491,18 +491,18 @@ class MapService {
   }
 
   // 地理编码（使用高德地图地理编码服务）
-  async geocode(address) {
+  async geocode(address, city = '全国') {
     try {
       const AMap = await this.loadMapScript()
       
       return new Promise((resolve, reject) => {
         AMap.plugin('AMap.Geocoder', () => {
           const geocoder = new AMap.Geocoder({
-            city: '全国'
+            city: city
           })
           
           geocoder.getLocation(address, (status, result) => {
-            if (status === 'complete' && result.geocodes.length > 0) {
+            if (status === 'complete' && result.geocodes && result.geocodes.length > 0) {
               const geocode = result.geocodes[0]
               resolve({
                 lat: geocode.location.lat,
@@ -512,7 +512,8 @@ class MapService {
                 address: geocode.formattedAddress
               })
             } else {
-              reject(new Error('地理编码失败'))
+              // 使用备选方案：返回空结果，让调用方处理
+              resolve(null)
             }
           })
         })
@@ -520,6 +521,108 @@ class MapService {
       
     } catch (error) {
       console.error('地理编码失败:', error)
+      return null
+    }
+  }
+
+  // 批量地理编码
+  async batchGeocode(addresses, city = '全国') {
+    try {
+      const results = []
+      
+      for (const address of addresses) {
+        const result = await this.geocode(address, city)
+        results.push({
+          address: address,
+          geocode: result
+        })
+      }
+      
+      return results
+    } catch (error) {
+      console.error('批量地理编码失败:', error)
+      return addresses.map(address => ({
+        address: address,
+        geocode: null
+      }))
+    }
+  }
+
+  // 添加路线绘制功能
+  async addRoutePolyline(map, routePoints, options = {}) {
+    try {
+      const AMap = await this.loadMapScript()
+      
+      if (!routePoints || routePoints.length < 2) {
+        console.warn('路线点数量不足，无法绘制路线')
+        return null
+      }
+      
+      // 转换坐标格式
+      const polylinePath = routePoints.map(point => {
+        if (Array.isArray(point) && point.length === 2) {
+          return new AMap.LngLat(point[0], point[1])
+        }
+        return new AMap.LngLat(116.397428, 39.90923) // 默认北京中心
+      })
+      
+      // 创建折线
+      const polyline = new AMap.Polyline({
+        path: polylinePath,
+        strokeColor: options.strokeColor || '#1890ff',
+        strokeOpacity: options.strokeOpacity || 0.8,
+        strokeWeight: options.strokeWeight || 6,
+        strokeStyle: options.strokeStyle || 'solid',
+        lineJoin: options.lineJoin || 'round',
+        lineCap: options.lineCap || 'round'
+      })
+      
+      // 添加折线到地图
+      map.add(polyline)
+      
+      // 适应折线视图
+      map.setFitView([polyline])
+      
+      return polyline
+    } catch (error) {
+      console.error('绘制路线失败:', error)
+      return null
+    }
+  }
+
+  // 完整的路线规划功能（包含标记和路线）
+  async createRoutePlan(map, locations, options = {}) {
+    try {
+      // 批量地理编码
+      const geocodeResults = await this.batchGeocode(locations, options.city || '全国')
+      
+      // 过滤有效的地理编码结果
+      const validGeocodes = geocodeResults
+        .filter(result => result.geocode !== null)
+        .map(result => result.geocode)
+      
+      if (validGeocodes.length === 0) {
+        console.warn('没有有效的地理编码结果，无法创建路线')
+        return null
+      }
+      
+      // 提取坐标点
+      const routePoints = validGeocodes.map(geocode => [geocode.lng, geocode.lat])
+      
+      // 添加路线标记
+      const routeMarkers = await this.addRouteMarkers(map, routePoints, options)
+      
+      // 绘制路线
+      const polyline = await this.addRoutePolyline(map, routePoints, options)
+      
+      return {
+        markers: routeMarkers,
+        polyline: polyline,
+        geocodes: validGeocodes,
+        points: routePoints
+      }
+    } catch (error) {
+      console.error('创建路线计划失败:', error)
       return null
     }
   }

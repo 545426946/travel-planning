@@ -7,13 +7,17 @@
     >
       <template #extra>
         <a-space>
-          <a-button type="primary" @click="showRoutePanel = true">
-            <template #icon><EnvironmentOutlined /></template>
-            路线规划
-          </a-button>
-          <a-button @click="refreshMap">
-            <template #icon><reload-outlined /></template>
+          <a-button type="primary" @click="refreshMap">
+            <template #icon><ReloadOutlined /></template>
             刷新地图
+          </a-button>
+          <a-button :type="isSelectMode ? 'primary' : 'default'" @click="toggleSelectMode">
+            <template #icon><EnvironmentOutlined /></template>
+            {{ isSelectMode ? '退出选择模式' : '标记选择' }}
+          </a-button>
+          <a-button @click="toggleFilters">
+            <template #icon><FilterOutlined /></template>
+            景点筛选
           </a-button>
           <a-button v-if="isPlanRoute" @click="clearPlanRoute" type="dashed">
             <template #icon><DeleteOutlined /></template>
@@ -25,15 +29,24 @@
 
     <div class="map-content">
       <!-- 地图组件 -->
-      <AmapMap
-        ref="amapRef"
-        :map-height="600"
-        :show-search="true"
-        :show-route-panel="showRoutePanel"
-        :markers="markers"
+      <SimpleMap
+        ref="mapRef"
+        :center="mapCenter"
+        :zoom="mapZoom"
+        :landmarks="markers"
+        :show-controls="true"
+        :select-mode="isSelectMode"
+        :selection-options="{ 
+          onSelect: handleMarkerSelected,
+          iconColor: '#1890ff',
+          iconText: '📍'
+        }"
         @marker-click="handleMarkerClick"
         @map-click="handleMapClick"
-        @place-select="handlePlaceSelect"
+        @map-ready="handleMapReady"
+        @marker-selected="handleMarkerSelected"
+        @selection-start="() => console.log('选择模式启动')"
+        @selection-stop="() => console.log('选择模式停止')"
       />
 
       <!-- 地点信息侧边栏 -->
@@ -48,141 +61,95 @@
         <div v-if="selectedPlace" class="place-details">
           <a-descriptions title="基本信息" size="small" bordered>
             <a-descriptions-item label="名称">{{ selectedPlace.name }}</a-descriptions-item>
-            <a-descriptions-item label="地址">{{ selectedPlace.address }}</a-descriptions-item>
-            <a-descriptions-item label="类型">{{ selectedPlace.type }}</a-descriptions-item>
-            <a-descriptions-item label="电话" v-if="selectedPlace.tel">{{ selectedPlace.tel }}</a-descriptions-item>
-            <a-descriptions-item label="距离" v-if="selectedPlace.distance">
-              {{ formatDistance(selectedPlace.distance) }}
-            </a-descriptions-item>
+            <a-descriptions-item label="城市">{{ selectedPlace.city || '未知' }}</a-descriptions-item>
+            <a-descriptions-item label="国家">{{ selectedPlace.country || '未知' }}</a-descriptions-item>
+            <a-descriptions-item label="类型">{{ getTypeLabel(selectedPlace.type) }}</a-descriptions-item>
+            <a-descriptions-item label="描述">{{ selectedPlace.description || '著名旅游景点' }}</a-descriptions-item>
           </a-descriptions>
 
           <div class="place-actions">
             <a-space>
-              <a-button type="primary" @click="addToRoute(selectedPlace)">
-                <template #icon><plus-outlined /></template>
-                添加到路线
-              </a-button>
-              <a-button @click="setAsOrigin(selectedPlace)">
-                <template #icon><environment-outlined /></template>
-                设为起点
-              </a-button>
-              <a-button @click="setAsDestination(selectedPlace)">
-                <template #icon><flag-outlined /></template>
-                设为终点
+              <a-button type="primary" @click="viewMoreInfo">
+                <template #icon><SearchOutlined /></template>
+                查看更多信息
               </a-button>
             </a-space>
           </div>
         </div>
       </a-drawer>
 
-      <!-- 路线规划面板 -->
+      <!-- 景点筛选面板 -->
       <a-drawer
-        title="路线规划"
-        :width="450"
-        :open="showRoutePanel"
+        title="景点筛选"
+        :width="400"
+        :open="showFilters"
         :mask-closable="true"
         :closable="true"
-        @close="showRoutePanel = false"
+        @close="showFilters = false"
       >
-        <div class="route-planning">
+        <div class="filter-panel">
           <a-form layout="vertical">
-            <a-form-item label="起点">
-              <a-input
-                v-model:value="routeOrigin"
-                placeholder="请输入起点地址"
-                :suffix="originMarker ? '✅' : null"
+            <a-form-item label="城市筛选">
+              <a-input 
+                v-model:value="searchCity" 
+                placeholder="请输入城市名称（如：北京、上海、西安等）" 
+                style="width: 100%"
+                @input="handleCitySearch"
+                @press-enter="applyFilters"
+                :allow-clear="true"
               />
+              <div style="margin-top: 8px; font-size: 12px; color: #666;">
+                提示：可输入城市名进行模糊搜索，支持中文城市名。当前支持城市：北京、上海、西安、广州、杭州、成都
+              </div>
+              <div v-if="filteredCities.length > 0" style="margin-top: 8px; font-size: 12px; color: #1890ff;">
+                匹配到 {{ filteredCities.length }} 个城市：{{ filteredCities.join(', ') }}
+              </div>
+              <div v-else-if="searchCity.trim() !== ''" style="margin-top: 8px; font-size: 12px; color: #ff4d4f;">
+                未找到匹配的城市，请检查输入
+              </div>
             </a-form-item>
             
-            <a-form-item label="终点">
-              <a-input
-                v-model:value="routeDestination"
-                placeholder="请输入终点地址"
-                :suffix="destinationMarker ? '✅' : null"
-              />
+            <a-form-item label="景点类型">
+              <a-select v-model:value="selectedType" style="width: 100%" @change="updateMarkers">
+                <a-select-option value="all">所有类型</a-select-option>
+                <a-select-option v-for="type in allTypes" :key="type" :value="type">
+                  {{ getTypeLabel(type) }}
+                </a-select-option>
+              </a-select>
             </a-form-item>
             
-            <a-form-item label="出行方式">
-              <a-select v-model:value="routeType" style="width: 100%">
-                <a-select-option value="driving">驾车</a-select-option>
-                <a-select-option value="transit">公交</a-select-option>
-                <a-select-option value="walking">步行</a-select-option>
+            <a-form-item label="国家/地区">
+              <a-select v-model:value="selectedCountry" style="width: 100%" @change="updateMarkers">
+                <a-select-option value="all">所有国家</a-select-option>
+                <a-select-option v-for="country in allCountries" :key="country" :value="country">
+                  {{ country }}
+                </a-select-option>
               </a-select>
             </a-form-item>
             
             <a-form-item>
-              <a-button 
-                type="primary" 
-                :loading="calculatingRoute" 
-                @click="calculateRoute"
-                block
-              >
-                开始规划
-              </a-button>
+              <a-space>
+                <a-button type="primary" @click="applyFilters">
+                  应用筛选
+                </a-button>
+                <a-button @click="resetFilters">
+                  重置筛选
+                </a-button>
+              </a-space>
             </a-form-item>
           </a-form>
-
-          <!-- 路线结果 -->
-          <div v-if="routeInfo" class="route-info">
-            <a-card title="路线信息" size="small">
-              <a-descriptions size="small" column={1}>
-                <a-descriptions-item label="距离">
-                  {{ formatDistance(routeInfo.distance) }}
-                </a-descriptions-item>
-                <a-descriptions-item label="预计时间">
-                  {{ formatDuration(routeInfo.duration) }}
-                </a-descriptions-item>
-                <a-descriptions-item label="收费" v-if="routeInfo.tolls">
-                  ¥{{ routeInfo.tolls }}
-                </a-descriptions-item>
-                <a-descriptions-item label="费用" v-if="routeInfo.cost">
-                  ¥{{ routeInfo.cost }}
-                </a-descriptions-item>
-              </a-descriptions>
-            </a-card>
-          </div>
-
-          <!-- 路线点管理 -->
-          <div class="route-points">
-            <a-card title="路线点" size="small">
-              <a-list
-                :data-source="routePoints"
-                size="small"
-                :bordered="false"
-              >
-                <template #renderItem="{ item, index }">
-                  <a-list-item>
-                    <a-list-item-meta>
-                      <template #title>
-                        <div>{{ item.name || `点 ${index + 1}` }}</div>
-                      </template>
-                      <template #description>
-                        <div>{{ item.address }}</div>
-                      </template>
-                    </a-list-item-meta>
-                    
-                    <template #actions>
-                      <a-space>
-                        <a-button size="small" type="text" @click="removeRoutePoint(index)">
-                          <delete-outlined />
-                        </a-button>
-                      </a-space>
-                    </template>
-                  </a-list-item>
-                </template>
-              </a-list>
-              
-              <a-button 
-                type="dashed" 
-                size="small" 
-                @click="clearRoutePoints"
-                block
-                style="margin-top: 8px"
-              >
-                清空路线点
-              </a-button>
-            </a-card>
-          </div>
+          
+          <!-- 景点统计信息 -->
+          <a-card title="景点统计" size="small" style="margin-top: 16px">
+            <a-descriptions size="small" column={1}>
+              <a-descriptions-item label="当前显示">
+                {{ filteredLandmarks.length }} 个景点
+              </a-descriptions-item>
+              <a-descriptions-item label="筛选条件">
+                {{ getFilterDescription() }}
+              </a-descriptions-item>
+            </a-descriptions>
+          </a-card>
         </div>
       </a-drawer>
     </div>
@@ -193,36 +160,43 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import AmapMap from '../components/AmapMap.vue'
-import amapService from '../services/amapService'
+import SimpleMap from '../components/SimpleMap.vue'
+import { landmarks } from '../data/landmarks'
 import { 
   ReloadOutlined, 
-  PlusOutlined, 
-  EnvironmentOutlined,
-  FlagOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  FilterOutlined,
+  SearchOutlined
 } from '@ant-design/icons-vue'
 
 // 路由引用
 const route = useRoute()
 
 // 地图引用
-const amapRef = ref(null)
+const mapRef = ref(null)
 
 // 状态管理
 const selectedPlace = ref(null)
-const showRoutePanel = ref(false)
-const routeOrigin = ref('')
-const routeDestination = ref('')
-const routeType = ref('driving')
-const calculatingRoute = ref(false)
-const routeInfo = ref(null)
-const routePoints = ref([])
 
 // 行程路线相关状态
 const planLocations = ref([])
 const isPlanRoute = ref(false)
 const planTitle = ref('')
+
+// 标记选择模式状态
+const isSelectMode = ref(false)
+
+// 景点数据相关状态
+const currentCity = ref('北京') // 默认显示北京
+const searchCity = ref('') // 城市搜索输入框
+const showFilters = ref(false)
+const selectedType = ref('all')
+const selectedCountry = ref('all')
+
+// 地图状态 - 高德地图使用 [lng, lat] 格式
+const mapCenter = ref([116.397128, 39.916527]) // 北京中心，高德地图格式
+const mapZoom = ref(10)
+const mapReady = ref(false)
 
 // 计算属性
 const pageTitle = computed(() => {
@@ -230,17 +204,64 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
-  return isPlanRoute.value ? '行程路线展示' : '查看旅行路线和地点'
+  return isPlanRoute.value ? '行程路线展示' : '使用高德地图服务，探索全球景点'
 })
 
 // 标记点
 const markers = ref([])
-const originMarker = ref(null)
-const destinationMarker = ref(null)
+
+// 计算匹配的城市列表
+const filteredCities = computed(() => {
+  if (!searchCity.value || searchCity.value.trim() === '') {
+    return []
+  }
+  
+  const searchTerm = searchCity.value.trim().toLowerCase()
+  const matchedCities = allCities.filter(city => 
+    city.toLowerCase().includes(searchTerm)
+  )
+  
+  return matchedCities
+})
+
+// 计算属性
+const filteredLandmarks = computed(() => {
+  let filtered = landmarks
+  
+  // 按城市筛选 - 支持模糊搜索
+  if (searchCity.value && searchCity.value.trim() !== '') {
+    const searchTerm = searchCity.value.trim().toLowerCase()
+    filtered = filtered.filter(item => 
+      item.city.toLowerCase().includes(searchTerm)
+    )
+  }
+  
+  // 按类型筛选
+  if (selectedType.value !== 'all') {
+    filtered = filtered.filter(item => item.type === selectedType.value)
+  }
+  
+  // 按国家筛选
+  if (selectedCountry.value !== 'all') {
+    filtered = filtered.filter(item => item.country === selectedCountry.value)
+  }
+  
+  return filtered
+})
+
+// 获取所有城市列表
+const allCities = [...new Set(landmarks.map(item => item.city))]
+
+// 获取所有类型列表
+const allTypes = [...new Set(landmarks.map(item => item.type))]
+
+// 获取所有国家列表
+const allCountries = [...new Set(landmarks.map(item => item.country))]
 
 // 处理标记点点击
 const handleMarkerClick = (place) => {
   selectedPlace.value = place
+  console.log('标记点点击:', place)
 }
 
 // 处理地图点击
@@ -249,10 +270,15 @@ const handleMapClick = (point) => {
   // 可以在这里添加点击地图添加标记点的功能
 }
 
-// 处理地点选择
-const handlePlaceSelect = (place) => {
-  selectedPlace.value = place
-  message.success(`已选择: ${place.name}`)
+// 处理地图准备完成
+const handleMapReady = (mapInstance) => {
+  console.log('地图加载完成:', mapInstance)
+  mapReady.value = true
+  
+  // 初始化景点标记
+  updateMarkers()
+  
+  message.success('地图加载成功！使用高德地图服务')
 }
 
 // 关闭地点详情面板
@@ -262,66 +288,26 @@ const closePlaceDrawer = () => {
 
 // 刷新地图
 const refreshMap = () => {
-  if (amapRef.value) {
+  if (mapRef.value && mapReady.value) {
     // 重新初始化地图
-    amapRef.value.initMap()
-  }
-  message.success('地图已刷新')
-}
-
-// 格式化距离
-const formatDistance = (distance) => {
-  if (!distance) return '未知'
-  if (distance < 1000) {
-    return `${distance}米`
+    mapRef.value.destroyMap()
+    setTimeout(() => {
+      if (mapRef.value.initMap) {
+        mapRef.value.initMap()
+      }
+    }, 100)
+    message.success('地图已刷新')
   } else {
-    return `${(distance / 1000).toFixed(1)}公里`
+    message.info('地图正在加载中，请稍后...')
   }
 }
 
-// 格式化时间
-const formatDuration = (seconds) => {
-  if (!seconds) return '未知'
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  
-  if (hours > 0) {
-    return `${hours}小时${minutes}分钟`
-  } else {
-    return `${minutes}分钟`
+// 查看更多信息
+const viewMoreInfo = () => {
+  if (selectedPlace.value) {
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(selectedPlace.value.name + ' ' + selectedPlace.value.city)}`
+    window.open(searchUrl, '_blank')
   }
-}
-
-// 添加到路线
-const addToRoute = (place) => {
-  routePoints.value.push(place)
-  message.success(`已将 ${place.name} 添加到路线`)
-}
-
-// 设为起点
-const setAsOrigin = (place) => {
-  routeOrigin.value = place.name
-  originMarker.value = place
-  message.success(`已将 ${place.name} 设为起点`)
-}
-
-// 设为终点
-const setAsDestination = (place) => {
-  routeDestination.value = place.name
-  destinationMarker.value = place
-  message.success(`已将 ${place.name} 设为终点`)
-}
-
-// 移除路线点
-const removeRoutePoint = (index) => {
-  routePoints.value.splice(index, 1)
-  message.success('路线点已移除')
-}
-
-// 清空路线点
-const clearRoutePoints = () => {
-  routePoints.value = []
-  message.success('路线点已清空')
 }
 
 // 清除行程路线
@@ -333,128 +319,160 @@ const clearPlanRoute = () => {
   message.success('行程路线已清除')
 }
 
-// 加载行程路线
-const loadPlanRoute = async () => {
-  const { locations, planTitle } = route.query
-  
-  if (!locations) return
-  
-  try {
-    // 解析地点信息
-    const locationList = locations.split('|').filter(loc => loc.trim())
-    
-    if (locationList.length === 0) {
-      message.warning('没有找到有效的地点信息')
-      return
-    }
-    
-    // 设置行程信息
-    planLocations.value = locationList
-    isPlanRoute.value = true
-    planTitle.value = planTitle || '行程路线'
-    
-    // 清空现有标记点
-    markers.value = []
-    
-    // 为每个地点获取坐标并添加标记点
-    for (let i = 0; i < locationList.length; i++) {
-      const location = locationList[i]
-      
-      try {
-        // 地理编码获取坐标
-        const result = await amapService.geocode(location)
-        
-        if (result && result.length > 0) {
-          const place = result[0]
-          
-          // 添加标记点
-          markers.value.push({
-            title: `${i + 1}. ${location}`,
-            position: [place.location.lng, place.location.lat],
-            address: place.formatted_address,
-            type: 'plan',
-            planIndex: i
-          })
-        }
-      } catch (error) {
-        console.error(`无法获取地点坐标: ${location}`, error)
-        // 即使无法获取坐标，也保留地点信息
-        markers.value.push({
-          title: `${i + 1}. ${location}`,
-          position: null,
-          address: location,
-          type: 'plan',
-          planIndex: i
-        })
-      }
-    }
-    
-    message.success(`已加载行程路线，包含 ${locationList.length} 个地点`)
-    
-  } catch (error) {
-    console.error('加载行程路线失败:', error)
-    message.error('加载行程路线失败')
+// 格式化距离（保留但暂时注释，以备后续使用）
+/* const formatDistance = (distance) => {
+  if (!distance) return '未知'
+  if (distance < 1000) {
+    return `${distance}米`
+  } else {
+    return `${(distance / 1000).toFixed(1)}公里`
   }
+} */
+
+// 获取类型标签
+const getTypeLabel = (type) => {
+  const typeLabels = {
+    'culture': '文化古迹',
+    'modern': '现代建筑',
+    'architecture': '建筑艺术',
+    'nature': '自然景观',
+    'religion': '宗教建筑',
+    'plan': '行程点'
+  }
+  return typeLabels[type] || type
 }
 
-// 计算路线
-const calculateRoute = async () => {
-  if (!routeOrigin.value || !routeDestination.value) {
-    message.warning('请输入起点和终点')
+// 切换选择模式
+const toggleSelectMode = async () => {
+  if (!mapReady.value) {
+    message.info('地图正在加载中，请稍后...')
     return
   }
 
-  calculatingRoute.value = true
-  
-  try {
-    let result
-    
-    if (routeType.value === 'driving') {
-      result = await amapService.routePlanning(routeOrigin.value, routeDestination.value)
-    } else if (routeType.value === 'transit') {
-      result = await amapService.transitRoutePlanning(routeOrigin.value, routeDestination.value)
-    } else if (routeType.value === 'walking') {
-      result = await amapService.walkingRoutePlanning(routeOrigin.value, routeDestination.value)
-    }
-    
-    if (result) {
-      routeInfo.value = result
-      message.success('路线规划成功')
+  isSelectMode.value = !isSelectMode.value
+
+  if (mapRef.value) {
+    if (isSelectMode.value) {
+      // 启动选择模式
+      await mapRef.value.startSelectionMode()
     } else {
-      message.error('路线规划失败')
+      // 停止选择模式
+      await mapRef.value.stopSelectionMode()
     }
-  } catch (error) {
-    console.error('路线规划失败:', error)
-    message.error('路线规划失败')
-  } finally {
-    calculatingRoute.value = false
   }
+}
+
+// 处理标记选择事件
+const handleMarkerSelected = (selectionData) => {
+  console.log('标记选择:', selectionData)
+  message.success(`已添加标记到位置: ${selectionData.position[0].toFixed(4)}, ${selectionData.position[1].toFixed(4)}`)
+  
+  // 可以在这里添加对新标记的处理逻辑
+  // 例如：添加到行程列表、保存到本地存储等
+}
+
+// 清除选中标记
+// 清除选中标记（保留但暂时注释，以备后续使用）
+/* const clearSelectedMarkers = async () => {
+  if (mapRef.value && isSelectMode.value) {
+    await mapRef.value.clearSelection()
+  }
+}
+
+// 获取选中标记（保留但暂时注释，以备后续使用）
+const getSelectedMarkers = () => {
+  if (mapRef.value) {
+    return mapRef.value.getSelectedMarkers()
+  }
+  return []
+} */
+
+// 筛选相关方法
+const toggleFilters = () => {
+  showFilters.value = !showFilters.value
+}
+
+const updateMarkers = () => {
+  console.log('更新标记数据，原始景点数量:', filteredLandmarks.value.length)
+  
+  // 直接传递原始landmark对象，确保position字段被正确传递
+  markers.value = filteredLandmarks.value.map(landmark => {
+    const markerData = { ...landmark }
+    
+    // 确保position字段存在且格式正确
+    if (!markerData.position || !Array.isArray(markerData.position) || markerData.position.length !== 2) {
+      console.warn('无效的坐标数据:', landmark.name, markerData.position)
+    }
+    
+    return markerData
+  })
+  
+  console.log('更新后的标记数量:', markers.value.length)
+}
+
+const applyFilters = () => {
+  updateMarkers()
+  showFilters.value = false
+  message.success(`已筛选出 ${filteredLandmarks.value.length} 个景点`)
+}
+
+// 城市搜索处理
+const handleCitySearch = () => {
+  // 实时更新筛选结果
+  updateMarkers()
+}
+
+const resetFilters = () => {
+  searchCity.value = ''
+  selectedType.value = 'all'
+  selectedCountry.value = 'all'
+  updateMarkers()
+  message.success('筛选条件已重置')
+}
+
+const getFilterDescription = () => {
+  const descriptions = []
+  
+  if (currentCity.value !== 'all') {
+    descriptions.push(`城市: ${currentCity.value}`)
+  }
+  
+  if (selectedType.value !== 'all') {
+    descriptions.push(`类型: ${getTypeLabel(selectedType.value)}`)
+  }
+  
+  if (selectedCountry.value !== 'all') {
+    descriptions.push(`国家: ${selectedCountry.value}`)
+  }
+  
+  return descriptions.length > 0 ? descriptions.join(', ') : '无筛选条件'
 }
 
 // 初始化示例数据
 onMounted(() => {
   // 检查是否有行程路线参数
   if (route.query.locations) {
-    loadPlanRoute()
+    // 加载行程路线功能暂时简化
+    const locationList = route.query.locations.split('|').filter(loc => loc.trim())
+    if (locationList.length > 0) {
+      planLocations.value = locationList
+      isPlanRoute.value = true
+      planTitle.value = route.query.planTitle || '行程路线'
+      
+      // 为行程地点创建标记点
+      markers.value = locationList.map((location, index) => ({
+        id: `plan-${index}`,
+        name: `${index + 1}. ${location}`,
+        type: 'plan',
+        description: '行程地点'
+      }))
+      
+      message.success(`已加载行程路线，包含 ${locationList.length} 个地点`)
+    }
   } else {
-    // 添加一些示例标记点
-    markers.value = [
-      {
-        title: '天安门广场',
-        position: [116.397428, 39.90923],
-        address: '北京市东城区东长安街'
-      },
-      {
-        title: '故宫博物院',
-        position: [116.397056, 39.917974],
-        address: '北京市东城区景山前街4号'
-      },
-      {
-        title: '颐和园',
-        position: [116.273174, 39.999872],
-        address: '北京市海淀区新建宫门路19号'
-      }
-    ]
+    // 使用新的景点数据
+    updateMarkers()
+    message.success(`已加载 ${filteredLandmarks.value.length} 个全球著名景点`)
   }
 })
 </script>
@@ -481,15 +499,7 @@ onMounted(() => {
   border-top: 1px solid #f0f0f0;
 }
 
-.route-planning {
+.filter-panel {
   padding: 16px 0;
-}
-
-.route-info {
-  margin-top: 16px;
-}
-
-.route-points {
-  margin-top: 16px;
 }
 </style>

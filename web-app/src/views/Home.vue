@@ -92,12 +92,44 @@
         </a-col>
       </a-row>
     </div>
+
+    <!-- 地图预览 -->
+    <div class="section">
+      <h2 class="section-title">地图功能</h2>
+      <a-card>
+        <div class="map-preview-section">
+          <div class="map-preview-content">
+            <div class="map-icon">
+              <EnvironmentOutlined style="font-size: 48px; color: #1890ff;" />
+            </div>
+            <div class="map-preview-info">
+              <h3>智能旅行地图</h3>
+              <p>点击下方按钮查看详细地图，包含全国主要城市景点分布、路线规划等功能</p>
+              <div class="map-features">
+                <a-tag color="blue">🎯 景点标记</a-tag>
+                <a-tag color="green">🗺️ 路线规划</a-tag>
+                <a-tag color="orange">📍 位置搜索</a-tag>
+                <a-tag color="purple">🔍 智能筛选</a-tag>
+              </div>
+            </div>
+          </div>
+          <div class="map-preview-action">
+            <a-button type="primary" size="large" @click="$router.push('/map')">
+              <template #icon><EnvironmentOutlined /></template>
+              查看地图
+            </a-button>
+          </div>
+        </div>
+      </a-card>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, onMounted, reactive, computed, nextTick } from 'vue'
 import authService from '../services/authService'
+import MapService from '../services/mapService.js'
+import { getDefaultAttractions } from '../data/cityAttractions'
 
 // 导入所需的图标组件
 import {
@@ -130,6 +162,8 @@ const currentUser = computed(() => authState.currentUser)
 
 const destinations = ref([])
 const templates = ref([])
+
+// 地图相关变量 - 现在只用于预览，完整地图在Map页面中
 
 // 从热门景点数据中随机抽取4个景点
 const getRandomDestinations = () => {
@@ -369,8 +403,6 @@ onMounted(() => {
   // 添加认证状态变化监听器
   window.addEventListener('authStateChange', handleAuthStateChange)
   
-  
-  
   // 随机抽取4个热门目的地
   destinations.value = getRandomDestinations()
 
@@ -576,6 +608,45 @@ onUnmounted(() => {
   color: #13c2c2;
 }
 
+/* 地图预览样式 */
+.map-preview-section {
+  padding: 24px;
+  text-align: center;
+}
+
+.map-preview-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.map-icon {
+  margin-right: 24px;
+}
+
+.map-preview-info h3 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.map-preview-info p {
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.map-features {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.map-preview-action {
+  margin-top: 16px;
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2rem;
@@ -590,6 +661,20 @@ onUnmounted(() => {
     width: 32px;
     height: 32px;
     font-size: 16px;
+  }
+  
+  .map-preview-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .map-icon {
+    margin-right: 0;
+    margin-bottom: 16px;
+  }
+  
+  .map-features {
+    justify-content: center;
   }
 }
 </style>

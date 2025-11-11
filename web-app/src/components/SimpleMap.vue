@@ -29,18 +29,11 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import MapService from '../services/mapService.js'
 import { message } from 'ant-design-vue'
 
-// 响应式数据
-const mapContainer = ref(null)
-const mapLoaded = ref(false)
-const mapInstance = ref(null)
-const markers = ref([])
-const mapStatus = ref(null)
-
-// 定义 props
+// Props
 const props = defineProps({
   center: {
     type: Array,
-    default: () => [39.916527, 116.397128]
+    default: () => [116.397128, 39.916527] // 北京默认中心
   },
   zoom: {
     type: Number,
@@ -64,27 +57,38 @@ const props = defineProps({
   }
 })
 
-// 定义 emits
-const emit = defineEmits(['map-ready', 'marker-click', 'map-click', 'selection-start', 'selection-stop', 'marker-selected'])
+// Emits
+const emit = defineEmits([
+  'map-ready',
+  'map-click',
+  'marker-click',
+  'marker-selected',
+  'selection-start',
+  'selection-stop'
+])
 
-// 初始化地图
+// 响应式数据
+const mapContainer = ref(null)
+const mapInstance = ref(null)
+const mapLoaded = ref(false)
+const mapStatus = ref(null)
+const markers = ref([])
+
+// 地图初始化
 const initMap = async () => {
   try {
-    if (!mapContainer.value) {
-      console.error('地图容器未找到')
-      return
-    }
+    if (!mapContainer.value) return
 
-    // 显示加载状态
-    mapLoaded.value = false
-
+    // 加载地图脚本
+    await MapService.loadMapScript()
+    
     // 创建地图实例
     mapInstance.value = await MapService.createMap(mapContainer.value, {
       center: props.center,
       zoom: props.zoom
     })
 
-    // 添加控制层
+    // 添加地图控件
     if (props.showControls) {
       await MapService.addControls(mapInstance.value)
     }
@@ -92,6 +96,8 @@ const initMap = async () => {
     // 添加景点标记
     if (props.landmarks && props.landmarks.length > 0) {
       await addLandmarkMarkers()
+    } else {
+      console.log('没有景点数据可显示')
     }
 
     // 绑定地图事件
@@ -104,18 +110,11 @@ const initMap = async () => {
     // 发送事件
     emit('map-ready', mapInstance.value)
 
-    message.success('地图加载成功！')
+    message.success('地图加载成功！使用高德地图服务')
 
   } catch (error) {
     console.error('地图初始化失败:', error)
     message.error('地图加载失败，请检查网络连接')
-    
-    // 显示错误状态
-    mapStatus.value = {
-      type: 'error',
-      status: '错误模式',
-      message: '地图服务不可用，请检查网络连接'
-    }
   }
 }
 
@@ -124,22 +123,30 @@ const addLandmarkMarkers = async () => {
   try {
     if (!mapInstance.value || !props.landmarks) return
 
+    console.log('开始添加景点标记，数据量:', props.landmarks.length)
+    
     // 清除现有标记
     await MapService.clearMarkers(mapInstance.value, markers.value)
     markers.value = []
 
-    // 过滤有效标记数据
-    const validLandmarks = props.landmarks.filter(landmark => 
-      landmark.latitude && landmark.longitude
-    )
+    // 过滤有效标记数据 - 适配高德地图的position数组格式
+    const validLandmarks = props.landmarks.filter(landmark => {
+      const isValid = landmark.position && Array.isArray(landmark.position) && landmark.position.length === 2
+      if (!isValid) {
+        console.warn('无效的景点数据:', landmark)
+      }
+      return isValid
+    })
+    
+    console.log('有效景点数据量:', validLandmarks.length)
     
     // 添加新标记
     const markerData = validLandmarks.map(landmark => ({
-      position: [landmark.latitude, landmark.longitude],
+      position: landmark.position,
       title: landmark.name,
       popupContent: `
         <div style="min-width: 200px;">
-          <h4 style="margin: 0 0 8px 0; color: #1890ff;">${landmark.name}</h4>
+          <h4 style="margin: 0 0 8px 0; color: #1890ff;">${landmark.icon || '📍'} ${landmark.name}</h4>
           <p style="margin: 0 0 8px 0; color: #666;">${landmark.description || '著名旅游景点'}</p>
           <div style="font-size: 12px; color: #999;">
             <div>城市: ${landmark.city || '未知'}</div>
@@ -151,10 +158,12 @@ const addLandmarkMarkers = async () => {
     }))
 
     markers.value = await MapService.addMarkers(mapInstance.value, markerData)
+    console.log('成功添加标记数量:', markers.value.length)
 
     // 适应所有标记的视图
     if (markers.value.length > 0) {
       await MapService.fitBounds(mapInstance.value, markers.value)
+      console.log('地图视图已适应标记')
     }
 
     // 绑定标记点击事件
@@ -174,12 +183,14 @@ const bindMapEvents = () => {
   if (!mapInstance.value) return
 
   // 地图点击事件
-  mapInstance.value.on('click', (e) => {
-    emit('map-click', {
-      lat: e.latlng.lat,
-      lng: e.latlng.lng
+  if (mapInstance.value.on) {
+    mapInstance.value.on('click', (e) => {
+      emit('map-click', {
+        lat: e.lnglat.lat,
+        lng: e.lnglat.lng
+      })
     })
-  })
+  }
 }
 
 // 设置地图中心
@@ -199,11 +210,17 @@ const setZoom = async (zoom) => {
 // 销毁地图
 const destroyMap = () => {
   if (mapInstance.value) {
-    MapService.destroyMap()
+    MapService.destroyMap(mapInstance.value)
     mapInstance.value = null
-    markers.value = []
     mapLoaded.value = false
   }
+}
+
+// 重新初始化地图
+const reinitMap = async () => {
+  destroyMap()
+  await nextTick()
+  await initMap()
 }
 
 // 启动选择模式
@@ -282,7 +299,6 @@ watch(() => props.zoom, (newZoom) => {
   }
 })
 
-// 监听选择模式变化
 watch(() => props.selectMode, async (newSelectMode, oldSelectMode) => {
   if (mapInstance.value && mapLoaded.value) {
     if (newSelectMode && !oldSelectMode) {
@@ -308,10 +324,16 @@ onUnmounted(() => {
 
 // 暴露方法给父组件
 defineExpose({
+  initMap,
+  destroyMap,
+  reinitMap,
   setCenter,
   setZoom,
-  destroyMap,
-  getMapStatus: () => mapStatus.value
+  startSelectionMode,
+  stopSelectionMode,
+  clearSelection,
+  getSelectedMarkers,
+  addRouteMarkers
 })
 </script>
 
@@ -320,17 +342,14 @@ defineExpose({
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 400px;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
 }
 
 .map {
   width: 100%;
   height: 100%;
-  opacity: 0;
   transition: opacity 0.3s ease;
+  opacity: 0;
 }
 
 .map.map-loaded {
@@ -347,11 +366,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.9);
-  z-index: 1000;
-}
-
-.loading-container {
-  text-align: center;
+  z-index: 999;
 }
 
 .map-info {
@@ -362,18 +377,7 @@ defineExpose({
   z-index: 1000;
 }
 
-/* Leaflet 地图样式调整 */
-:deep(.leaflet-container) {
-  background: #f8f9fa;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-}
-
-:deep(.leaflet-popup-content) {
-  margin: 8px 12px;
-}
-
-:deep(.leaflet-popup-content-wrapper) {
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.loading-container {
+  text-align: center;
 }
 </style>

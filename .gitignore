@@ -1,32 +1,23 @@
-# 微信小程序
-project.config.json
-project.private.config.json
-
-# 日志文件
-*.log
+# Dependencies
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 运行时数据
-pids
-*.pid
-*.seed
-*.pid.lock
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# 依赖目录
-node_modules/
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# 可选 npm 缓存目录
-.npm
-
-# 可选 eslint 缓存
-.eslintcache
-
-# 微信用用户数据
-.wx/
-
-# 操作系统生成的文件
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -35,49 +26,46 @@ node_modules/
 ehthumbs.db
 Thumbs.db
 
-# IDE 文件
-.vscode/
-.idea/
-*.swp
-*.swo
+# WeChat miniprogram
+project.private.config.json
 
-# 临时文件
-*.tmp
-*.temp
+# Logs
+logs
+*.log
 
-# 编译输出
-dist/
-build/
+# Coverage directory used by tools like istanbul
+coverage/
 
-# 环境变量文件
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# nyc test coverage
+.nyc_output
 
-# 云函数本地调试文件
-cloudfunctions/
+# Dependency directories
+jspm_packages/
 
-# 云存储本地文件
-miniprogram/storage/
+# Optional npm cache directory
+.npm
 
-# 项目特定忽略文件
-mysql-installer.exe
-.codebuddy/
+# Optional REPL history
+.node_repl_history
 
-# web-app 项目忽略文件
-web-app/node_modules/
-web-app/dist/
-web-app/build/
-web-app/.env
+# Output of 'npm pack'
+*.tgz
 
-# 项目特定忽略文件
-mysql-installer.exe
-.codebuddy/
+# Yarn Integrity file
+.yarn-integrity
 
-# web-app 项目忽略文件
-web-app/node_modules/
-web-app/dist/
-web-app/build/
-web-app/.env
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless

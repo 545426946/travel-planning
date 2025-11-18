@@ -1,41 +1,5 @@
 {
-  "name": "travel-planner-web",
-  "version": "1.0.0",
-  "description": "轻量旅行规划网页版应用",
-  "main": "web-app/index.html",
-  "scripts": {
-    "dev": "cd web-app && npm install && npm run dev",
-    "serve": "cd web-app && npm install && npm run serve",
-    "start": "cd web-app && npm install && npm run start",
-    "build": "cd web-app && npm install && npm run build",
-    "preview": "cd web-app && npm install && npm run preview",
-    "deploy": "echo '请配置部署脚本'",
-    "quick-start": "powershell -ExecutionPolicy Bypass -File start.ps1"
-  },
-  "keywords": [
-    "travel",
-    "planner",
-    "web-app",
-    "supabase",
-    "pwa"
-  ],
-  "author": "轻量旅行规划团队",
-  "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.79.0"
-  },
-  "devDependencies": {
-    "serve": "^14.0.0"
-  },
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/your-username/travel-planner-web.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-username/travel-planner-web/issues"
-  },
-  "homepage": "https://github.com/your-username/travel-planner-web#readme"
+    "@supabase/supabase-js": "^2.81.1"
+  }
 }

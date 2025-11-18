@@ -14,8 +14,7 @@ const db = {
         .single()
         .then(({ data, error }) => ({ data, error }))
         .catch(error => ({ data: null, error }))
-    }
-  },,
+    },
 
     // 创建或更新用户
     upsert(userData) {

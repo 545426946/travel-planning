@@ -6,7 +6,7 @@
   },
   "setting": {
     "urlCheck": true,
-    "es6": true,
+    "es6": false,
     "enhance": true,
     "postcss": true,
     "preloadBackgroundData": false,
@@ -27,8 +27,8 @@
     "useApiHook": true,
     "useApiHostProcess": true,
     "babelSetting": {
-      "ignore": [],
-      "disablePlugins": [],
+      "ignore": ["**"],
+      "disablePlugins": ["@babel/plugin-transform-spread", "@babel/plugin-transform-destructuring"],
       "outputPath": ""
     },
     "enableEngineNative": false,

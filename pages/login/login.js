@@ -1,5 +1,5 @@
 // pages/login/login.js
-const { supabase } = require('../../utils/supabase')
+const supabase = require('../../utils/supabase').supabase
 const app = getApp()
 
 Page({
@@ -45,7 +45,7 @@ Page({
   onInput(e) {
     const field = e.currentTarget.dataset.field
     const value = e.detail.value
-    const formData = { ...this.data.formData }
+    const formData = Object.assign({}, this.data.formData)
     formData[field] = value
     
     this.setData({ 

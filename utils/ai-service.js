@@ -1,6 +1,6 @@
 // utils/ai-service.js - Mistral AI 服务模块
-const { supabase } = require('./supabase')
-const { AI_CONFIG } = require('./config')
+const supabase = require('./supabase').supabase
+const AI_CONFIG = require('./config').AI_CONFIG
 
 class AIService {
   constructor() {
@@ -18,13 +18,12 @@ class AIService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`
         },
-        body: JSON.stringify({
+        body: JSON.stringify(Object.assign({
           model: this.model,
           messages: messages,
           temperature: options.temperature || 0.7,
-          max_tokens: options.maxTokens || 2000,
-          ...options
-        })
+          max_tokens: options.maxTokens || 2000
+        }, options))
       })
 
       if (!response.ok) {

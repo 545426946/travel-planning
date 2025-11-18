@@ -1,6 +1,6 @@
 // utils/ai-integration.js - AI 集成工具类
-const { aiService } = require('./ai-service')
-const { completeDb } = require('./complete_database')
+const aiService = require('./ai-service').aiService
+const completeDb = require('./complete_database').completeDb
 
 class AIIntegration {
   // 智能行程规划
@@ -82,7 +82,7 @@ class AIIntegration {
         const { data, error } = await supabase
           .from('popular_routes')
           .insert({
-            ...routeData,
+            routeData: routeData,
             is_ai_generated: true,
             created_by: createdBy
           })
@@ -138,11 +138,10 @@ class AIIntegration {
       const { data: preferences } = await completeDb.userPreferences.getByUserId(userId)
       const { data: recentPlans } = await completeDb.travelPlans.getByUserId(userId, 'planned', 3)
       
-      const enrichedContext = {
+      const enrichedContext = Object.assign({
         userPreferences: preferences,
-        recentPlans: recentPlans,
-        ...context
-      }
+        recentPlans: recentPlans
+      }, context)
       
       const aiResponse = await aiService.travelQA(question, enrichedContext)
       

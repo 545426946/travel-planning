@@ -1,5 +1,5 @@
 // utils/database.js
-const { supabase } = require('./supabase')
+const supabase = require('./supabase').supabase
 
 // 数据库操作封装
 const db = {

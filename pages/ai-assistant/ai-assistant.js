@@ -1,5 +1,5 @@
 // pages/ai-assistant/ai-assistant.js
-const { aiIntegration } = require('../../utils/ai-integration')
+const aiIntegration = require('../../utils/ai-integration').aiIntegration
 const app = getApp()
 
 Page({
@@ -59,7 +59,7 @@ Page({
     if (!message) return
 
     // 添加用户消息到聊天记录
-    const newHistory = [...this.data.chatHistory]
+    const newHistory = this.data.chatHistory.slice()
     newHistory.push({
       type: 'user',
       content: message,

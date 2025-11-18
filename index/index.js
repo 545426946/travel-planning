@@ -1,7 +1,7 @@
 // 获取应用实例
 const app = getApp()
-const { supabase } = require('../utils/supabase')
-const { aiIntegration } = require('../utils/ai-integration')
+const supabase = require('../utils/supabase').supabase
+const aiIntegration = require('../utils/ai-integration').aiIntegration
 
 Page({
   data: {

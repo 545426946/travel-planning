@@ -1,5 +1,5 @@
 // app.js
-const { supabase } = require('./utils/supabase')
+const supabase = require('./utils/supabase').supabase
 
 App({
   onLaunch() {
@@ -57,10 +57,7 @@ App({
       
       if (data && !error) {
         // 更新全局和本地存储的用户信息
-        this.globalData.userInfo = {
-          ...localUserInfo,
-          ...data
-        }
+        this.globalData.userInfo = Object.assign({}, localUserInfo, data)
         wx.setStorageSync('userInfo', this.globalData.userInfo)
         console.log('用户信息已更新:', data)
       }

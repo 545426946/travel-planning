@@ -14,7 +14,8 @@ const db = {
         .single()
         .then(({ data, error }) => ({ data, error }))
         .catch(error => ({ data: null, error }))
-    },
+    }
+  },,
 
     // 创建或更新用户
     upsert(userData) {
@@ -25,7 +26,7 @@ const db = {
         .then(({ data, error }) => ({ data, error }))
         .catch(error => ({ data: null, error }))
     }
-  },"explanation":"修改database.js中的用户操作函数，改为Promise链式调用"}
+  },
 
   // 行程相关操作
   travelPlans: {

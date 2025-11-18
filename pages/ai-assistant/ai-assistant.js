@@ -117,7 +117,7 @@ Page({
       this.setData({ isLoading: false })
       this.scrollToBottom()
     }
-  }
+  },
 
   // 智能规划行程
   async planItinerary() {

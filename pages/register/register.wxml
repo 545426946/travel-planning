@@ -98,7 +98,7 @@
         loading="{{isLoading}}"
         disabled="{{isLoading || !agreeTerms}}"
       >
-        {{isLoading ? '注册中...' : '立即注册'}}
+        {{isLoading ? '注册中' : '立即注册'}}
       </button>
 
       <!-- 登录链接 -->

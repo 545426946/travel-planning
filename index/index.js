@@ -278,7 +278,7 @@ Page({
       title: 'AI 智能规划',
       content: '请描述您的旅行需求，例如：我想去云南大理丽江玩5天，预算3000元，喜欢自然风光和古镇文化',
       editable: true,
-      placeholderText: '输入您的旅行需求...',
+      placeholderText: '输入您的旅行需求',
       success: async (res) => {
         if (res.confirm && res.content.trim()) {
           wx.showLoading({ title: 'AI 正在规划...' });
@@ -410,7 +410,7 @@ Page({
   showAIResultModal(title, content) {
     wx.showModal({
       title: title,
-      content: content.length > 500 ? content.substring(0, 500) + '...' : content,
+      content: content.length > 500 ? content.substring(0, 500) + '更多' : content,
       showCancel: false,
       confirmText: '知道了',
       success: () => {
@@ -631,7 +631,7 @@ Page({
   showSettings() {
     wx.showModal({
       title: '设置',
-      content: '更多设置功能正在开发中...',
+      content: '更多设置功能正在开发中',
       showCancel: false,
       confirmText: '知道了'
     })

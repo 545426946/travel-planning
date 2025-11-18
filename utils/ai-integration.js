@@ -233,7 +233,7 @@ class AIIntegration {
     // 解析AI推荐的景点列表
     return {
       destinations: [], // 解析后的景点列表
-      summary: aiResponse.substring(0, 200) + '...', // 摘要
+      summary: aiResponse.substring(0, 200) + '点', // 摘要
       fullResponse: aiResponse
     }
   }
@@ -242,7 +242,7 @@ class AIIntegration {
   parseAIRouteToData(aiResponse, theme) {
     return {
       title: theme + '主题路线',
-      description: aiResponse.substring(0, 500),
+      description: aiResponse.substring(0, 500) + '描述',
       itinerary: aiResponse,
       tags: [theme, 'AI生成'],
       difficulty_level: 2,
@@ -264,7 +264,7 @@ class AIIntegration {
   // 解析景点描述
   parseDestinationDescription(aiResponse) {
     return {
-      short: aiResponse.substring(0, 200),
+      short: aiResponse.substring(0, 200) + '短',
       full: aiResponse,
       tags: ['热门推荐']
     }
@@ -278,7 +278,7 @@ class AIIntegration {
 
   extractDescription(text) {
     const lines = text.split('\n').filter(line => line.trim())
-    return lines.slice(0, 3).join(' ').substring(0, 200)
+    return lines.slice(0, 3).join(' ').substring(0, 200) + '描述'
   }
 
   extractDestination(text) {

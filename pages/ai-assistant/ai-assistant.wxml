@@ -34,7 +34,7 @@
             <view class="dot"></view>
             <view class="dot"></view>
           </view>
-          <text class="typing-text">AI正在思考中...</text>
+          <text class="typing-text">AI正在思考中</text>
         </view>
       </view>
     </view>
@@ -115,7 +115,7 @@
     <view class="input-wrapper">
       <input 
         class="message-input" 
-        placeholder="请输入您的问题..." 
+        placeholder="请输入您的问题" 
         value="{{inputValue}}"
         bindinput="onInput"
         bindconfirm="sendMessage"

@@ -92,7 +92,7 @@
         loading="{{isLoading}}"
         disabled="{{isLoading}}"
       >
-        {{isLoading ? '登录中...' : '登录'}}
+        {{isLoading ? '登录中' : '登录'}}
       </button>
 
       <!-- 注册链接 -->
@@ -117,7 +117,7 @@
         disabled="{{isLoading}}"
       >
         <text class="wechat-logo">🟢</text>
-        {{isLoading ? '授权中...' : '微信一键登录'}}
+        {{isLoading ? '授权中' : '微信一键登录'}}
       </button>
 
       <!-- 微信登录说明 -->

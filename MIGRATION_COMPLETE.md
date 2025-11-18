@@ -68,7 +68,7 @@ CREATE TABLE travel_plans (
   tags TEXT[],
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  -- 其他扩展字段...
+  -- 其他扩展字段
 );
 ```
 

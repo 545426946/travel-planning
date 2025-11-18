@@ -159,7 +159,7 @@ Page({
             } else {
               wx.showModal({
                 title: '规划建议',
-                content: result.aiResponse.substring(0, 500) + '...',
+                content: result.aiResponse.substring(0, 500) + '建议',
                 showCancel: false
               })
             }
@@ -276,7 +276,7 @@ Page({
   // 显示规划结果
   showPlanResult(result) {
     const content = result.aiResponse.length > 500 
-      ? result.aiResponse.substring(0, 500) + '...' 
+      ? result.aiResponse.substring(0, 500) + '结果' 
       : result.aiResponse
 
     wx.showModal({

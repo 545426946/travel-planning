@@ -1,5 +1,6 @@
 // pages/login/login.js
 const supabase = require('../../utils/supabase').supabase
+const Auth = require('../../utils/auth').Auth
 const app = getApp()
 
 Page({
@@ -27,7 +28,7 @@ Page({
   onLoad() {
     console.log('登录页面加载')
     // 检查是否已登录
-    if (app.globalData.isLoggedIn) {
+    if (Auth.isLoggedIn()) {
       this.redirectToHome()
     }
     
@@ -70,7 +71,7 @@ Page({
 
   // 表单验证
   validateForm() {
-    const { formData } = this.data
+    const formData = this.data.formData;
     const errors = {}
     let isValid = true
 
@@ -100,14 +101,18 @@ Page({
     this.setData({ isLoading: true })
 
     try {
-      const { formData, rememberMe } = this.data
+      const formData = this.data.formData;
+      const rememberMe = this.data.rememberMe;
 
       // 查询用户信息
-      const { data: users, error: queryError } = await supabase
+      const queryResult = await supabase
         .from('users')
         .select('*')
         .or(`username.eq.${formData.username},email.eq.${formData.username},phone.eq.${formData.username}`)
         .limit(1)
+
+      const users = queryResult.data;
+      const queryError = queryResult.error;
 
       if (queryError) {
         throw new Error('查询用户失败：' + queryError.message)
@@ -133,11 +138,11 @@ Page({
         phone: user.phone,
         avatar: user.avatar || 'https://ai-public.mastergo.com/ai/img_res/65805eacde859672f105ac7cb9520d50.jpg',
         loginType: 'account',
-        token: this.generateToken(user.id)
+        token: Auth.generateToken(user.id)
       }
 
-      // 保存用户信息
-      await this.saveUserLogin(userInfo, rememberMe)
+      // 使用Auth工具保存用户信息
+      Auth.saveUserLogin(userInfo, rememberMe)
 
       // 登录成功
       wx.showToast({
@@ -184,7 +189,7 @@ Page({
       }
 
       // 保存或更新用户信息到数据库
-      const { data, error } = await supabase
+      const result = await supabase
         .from('users')
         .upsert({
           openid: userData.openid,
@@ -195,6 +200,9 @@ Page({
           onConflict: 'openid'
         })
         .select()
+
+      const data = result.data;
+      const error = result.error;
 
       if (error) {
         console.warn('保存微信用户失败:', error)
@@ -207,11 +215,11 @@ Page({
         avatar: userData.avatar,
         openid: userData.openid,
         loginType: 'wechat',
-        token: this.generateToken(userData.openid)
+        token: Auth.generateToken(userData.openid)
       }
 
-      // 保存登录状态
-      await this.saveUserLogin(finalUserInfo, false)
+      // 使用Auth工具保存登录状态
+      Auth.saveUserLogin(finalUserInfo, false)
 
       wx.showToast({
         title: '登录成功',
@@ -252,31 +260,6 @@ Page({
         fail: reject
       })
     })
-  },
-
-  // 生成简单token
-  generateToken(userId) {
-    return 'token_' + userId + '_' + Date.now()
-  },
-
-  // 保存用户登录信息
-  async saveUserLogin(userInfo, rememberMe) {
-    // 保存到全局状态
-    app.globalData.userInfo = userInfo
-    app.globalData.isLoggedIn = true
-
-    // 保存到本地存储
-    wx.setStorageSync('userInfo', userInfo)
-
-    // 如果选择记住我，保存用户名
-    if (rememberMe && userInfo.username) {
-      wx.setStorageSync('savedUsername', userInfo.username)
-    } else {
-      wx.removeStorageSync('savedUsername')
-    }
-
-    // 记录登录时间
-    wx.setStorageSync('loginTime', new Date().toISOString())
   },
 
   // 加载保存的用户名

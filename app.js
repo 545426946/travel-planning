@@ -1,5 +1,6 @@
 // app.js
 const supabase = require('./utils/supabase').supabase
+const Auth = require('./utils/auth').Auth
 
 App({
   onLaunch() {
@@ -27,10 +28,18 @@ App({
 
   // 检查登录状态
   checkLoginStatus() {
-    const userInfo = wx.getStorageSync('userInfo')
+    const userInfo = Auth.getCurrentUser()
     if (userInfo) {
       this.globalData.userInfo = userInfo
       this.globalData.isLoggedIn = true
+      
+      // 检查登录是否过期
+      if (Auth.isLoginExpired(30)) {
+        console.log('登录已过期，需要重新登录')
+        Auth.clearUserLogin()
+        this.globalData.isLoggedIn = false
+        return
+      }
       
       // 检查用户信息是否完整，如果不完整则尝试从数据库更新
       if (!userInfo.id || !userInfo.name) {
@@ -41,28 +50,9 @@ App({
 
   // 更新用户信息
   async updateUserInfo(localUserInfo) {
-    try {
-      let query = supabase.from('users').select('*')
-      
-      // 根据不同的登录标识查询用户
-      if (localUserInfo.openid) {
-        query = query.eq('openid', localUserInfo.openid)
-      } else if (localUserInfo.username) {
-        query = query.eq('username', localUserInfo.username)
-      } else if (localUserInfo.email) {
-        query = query.eq('email', localUserInfo.email)
-      }
-      
-      const { data, error } = await query.single()
-      
-      if (data && !error) {
-        // 更新全局和本地存储的用户信息
-        this.globalData.userInfo = Object.assign({}, localUserInfo, data)
-        wx.setStorageSync('userInfo', this.globalData.userInfo)
-        console.log('用户信息已更新:', data)
-      }
-    } catch (error) {
-      console.warn('更新用户信息失败:', error)
+    const updatedUserInfo = await Auth.refreshUserInfo(supabase)
+    if (updatedUserInfo) {
+      this.globalData.userInfo = updatedUserInfo
     }
   },
 
@@ -97,7 +87,9 @@ App({
                 last_login: new Date().toISOString()
               })
               .select()
-              .then(({ data, error }) => {
+              .then((result) => {
+                const data = result.data;
+                const error = result.error;
                 if (error) {
                   console.warn('保存用户到数据库失败:', error)
                 } else if (data && data.length > 0) {
@@ -140,11 +132,9 @@ App({
 
   // 退出登录
   logout() {
+    Auth.clearUserLogin()
     this.globalData.userInfo = null
     this.globalData.isLoggedIn = false
-    wx.removeStorageSync('userInfo')
-    wx.removeStorageSync('savedUsername')
-    wx.removeStorageSync('loginTime')
     console.log('退出登录')
   },
 

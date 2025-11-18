@@ -231,29 +231,32 @@ class AIService {
   // 生成个性化推荐
   async generatePersonalizedRecommendations(userId, userHistory = {}) {
     // 获取用户偏好和历史记录
-    const { data: preferences } = await supabase
+    const preferencesResult = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
-      .single()
-
-    const { data: plans } = await supabase
-      .from('travel_plans')
-      .select('destination, travel_type, tags')
-      .eq('user_id', userId)
-      .limit(5)
-
-    const { data: favorites } = await supabase
-      .from('user_favorites')
-      .select(`
-        target_type,
-        target_id,
-        ${'destinations(name, location, category)'},
-        ${'popular_routes(title, tags)'}
-      `)
-      .eq('user_id', userId)
-      .eq('target_type', 'destination')
-      .limit(10)
+      .single();
+    const preferences = preferencesResult.data;
+ 
+     const plansResult = await supabase
+       .from('travel_plans')
+       .select('destination, travel_type, tags')
+       .eq('user_id', userId)
+       .limit(5);
+     const plans = plansResult.data;
+ 
+     const favoritesResult = await supabase
+       .from('user_favorites')
+       .select(`
+         target_type,
+         target_id,
+         ${'destinations(name, location, category)'},
+         ${'popular_routes(title, tags)'}
+       `)
+       .eq('user_id', userId)
+       .eq('target_type', 'destination')
+       .limit(10);
+     const favorites = favoritesResult.data;
 
     const systemPrompt = `基于用户的偏好和历史数据，生成个性化推荐。
 

@@ -2,6 +2,7 @@
 const app = getApp()
 const supabase = require('../utils/supabase').supabase
 const aiIntegration = require('../utils/ai-integration').aiIntegration
+const Auth = require('../utils/auth').Auth
 
 Page({
   data: {
@@ -131,26 +132,33 @@ Page({
     console.log('Tab数据:', this.data.tabs);
     
     // 获取用户信息
-    const userInfo = app.globalData.userInfo || wx.getStorageSync('userInfo')
+    const userInfo = Auth.getCurrentUser()
     if (userInfo) {
       this.setData({ userInfo })
       // 加载用户统计信息
       this.loadUserStats()
+      // 加载用户的行程数据
+      this.loadUserTravelPlans()
     }
     
-    // 加载热门景点数据
+    // 加载热门景点数据（公共数据）
     this.loadDestinations()
-    
-    // 加载行程数据
-    this.loadTravelPlans()
   },
 
   onShow() {
     // 每次页面显示时检查用户登录状态
-    const userInfo = app.globalData.userInfo || wx.getStorageSync('userInfo')
+    const userInfo = Auth.getCurrentUser()
     this.setData({ userInfo })
     if (userInfo) {
       this.loadUserStats()
+      this.loadUserTravelPlans()
+    } else {
+      // 未登录则清空用户相关数据
+      this.setData({
+        myTravelPlans: [],
+        travelPlans: [],
+        stats: { visitedPlaces: 0, favoriteRoutes: 0 }
+      })
     }
   },
 
@@ -162,7 +170,9 @@ Page({
       .eq('is_featured', true)
       .order('rating', { ascending: false })
       .limit(8)
-      .then(({ data, error }) => {
+      .then((result) => {
+        const data = result.data;
+        const error = result.error;
         if (error) {
           console.error('加载景点数据失败:', error)
           return
@@ -194,15 +204,25 @@ Page({
       })
   },
 
-  // 加载行程数据
-  loadTravelPlans() {
+  // 加载行程数据（仅加载当前用户的行程）
+  loadUserTravelPlans() {
+    const userId = Auth.getCurrentUserId()
+    
+    if (!userId) {
+      console.log('用户未登录，跳过加载个人行程')
+      return
+    }
+
     supabase
       .from('travel_plans')
       .select('*')
+      .eq('user_id', userId)  // 关键：只查询当前用户的行程
       .eq('status', 'planned')
       .order('created_at', { ascending: false })
-      .limit(4)
-      .then(({ data, error }) => {
+      .limit(10)
+      .then((result) => {
+        const data = result.data;
+        const error = result.error;
         if (error) {
           console.error('加载行程数据失败:', error)
           return
@@ -210,21 +230,28 @@ Page({
 
         // 转换数据格式
         const travelPlans = data.map(item => ({
+          id: item.id,
           title: item.title,
           duration: this.calculateDuration(item.start_date, item.end_date),
-          image: `https://picsum.photos/seed/plan${item.id}/400/240.jpg`
+          image: `https://picsum.photos/seed/plan${item.id}/400/240.jpg`,
+          destination: item.destination,
+          startDate: item.start_date,
+          endDate: item.end_date,
+          userId: item.user_id  // 保存用户ID用于权限验证
         }))
 
         this.setData({ 
           myTravelPlans: travelPlans,
           aiRoutes: data.slice(0, 2).map(item => ({
+            id: item.id,
             name: item.title,
             desc: item.description || item.destination,
-            image: `https://picsum.photos/seed/route${item.id}/600/320.jpg`
+            image: `https://picsum.photos/seed/route${item.id}/600/320.jpg`,
+            userId: item.user_id
           }))
         })
         
-        console.log('行程数据加载成功:', travelPlans.length)
+        console.log('用户行程数据加载成功:', travelPlans.length)
       })
       .catch(error => {
         console.error('加载行程数据出错:', error)
@@ -266,13 +293,12 @@ Page({
   async aiPlanItinerary() {
     console.log('AI 智能规划行程');
     
-    if (!this.data.userInfo) {
-      wx.showToast({
-        title: '请先登录',
-        icon: 'none'
-      });
+    // 检查登录状态
+    if (!Auth.requireLogin()) {
       return
     }
+
+    const userId = Auth.getCurrentUserId()
 
     wx.showModal({
       title: 'AI 智能规划',
@@ -285,7 +311,7 @@ Page({
           
           try {
             const result = await aiIntegration.planIntelligentItinerary(
-              this.data.userInfo.id, 
+              userId, 
               res.content
             );
 
@@ -297,8 +323,8 @@ Page({
                 icon: 'success'
               });
 
-              // 重新加载行程数据
-              await this.loadTravelPlans();
+              // 重新加载用户的行程数据
+              await this.loadUserTravelPlans();
 
               // 显示AI生成结果
               this.showAIResultModal('行程规划结果', result.aiResponse);
@@ -322,20 +348,17 @@ Page({
   async getSmartRecommendations() {
     console.log('获取智能景点推荐');
     
-    if (!this.data.userInfo) {
-      wx.showToast({
-        title: '请先登录',
-        icon: 'none'
-      });
+    // 检查登录状态
+    if (!Auth.requireLogin()) {
       return
     }
+
+    const userId = Auth.getCurrentUserId()
 
     wx.showLoading({ title: 'AI 正在推荐...' });
     
     try {
-      const result = await aiIntegration.getSmartDestinationRecommendations(
-        this.data.userInfo.id
-      );
+      const result = await aiIntegration.getSmartDestinationRecommendations(userId);
 
       wx.hideLoading();
 
@@ -368,6 +391,8 @@ Page({
   async showAIHelper() {
     console.log('AI 问答助手');
     
+    const userId = Auth.getCurrentUserId()
+    
     wx.showModal({
       title: 'AI 旅行助手',
       content: '请输入您的旅行问题，我会为您详细解答',
@@ -379,7 +404,7 @@ Page({
           
           try {
             const result = await aiIntegration.askTravelQuestion(
-              this.data.userInfo ? this.data.userInfo.id : null,
+              userId,
               res.content
             );
 
@@ -449,13 +474,12 @@ Page({
 
   // 手动创建行程
   async createManualPlan() {
-    if (!this.data.userInfo) {
-      wx.showToast({
-        title: '请先登录',
-        icon: 'none'
-      });
+    // 检查登录状态
+    if (!Auth.requireLogin()) {
       return
     }
+
+    const userId = Auth.getCurrentUserId()
 
     // 示例：创建一个新行程
     const newPlan = {
@@ -467,7 +491,7 @@ Page({
       budget: 2000,
       travel_type: 'leisure',
       status: 'planned',
-      user_id: this.data.userInfo.id,
+      user_id: userId,  // 关键：设置为当前用户ID
       is_ai_generated: false,
       tags: ['自由行', '休闲']
     }
@@ -476,7 +500,9 @@ Page({
       .from('travel_plans')
       .insert(newPlan)
       .select()
-      .then(({ data, error }) => {
+      .then((result) => {
+        const data = result.data;
+        const error = result.error;
         if (error) {
           console.error('创建行程失败:', error)
           wx.showToast({
@@ -491,8 +517,8 @@ Page({
           icon: 'success'
         });
 
-        // 重新加载行程数据
-        this.loadTravelPlans()
+        // 重新加载用户的行程数据
+        this.loadUserTravelPlans()
       })
       .catch(error => {
         console.error('创建行程出错:', error)
@@ -512,27 +538,32 @@ Page({
 
   // 加载用户统计信息
   async loadUserStats() {
-    if (!this.data.userInfo) return
+    const userId = Auth.getCurrentUserId()
+    
+    if (!userId) {
+      console.log('用户未登录，跳过加载统计信息')
+      return
+    }
 
     try {
-      // 并行查询用户统计数据
-      const [plansResult, favoritesResult] = await Promise.all([
+      // 并行查询用户统计数据（只查询当前用户的数据）
+      const results = await Promise.all([
         // 查询用户的行程数量
         supabase
           .from('travel_plans')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', this.data.userInfo.id)
+          .eq('user_id', userId)  // 关键：只统计当前用户的数据
           .eq('status', 'completed'),
         
         // 查询用户的收藏数量
         supabase
           .from('user_favorites')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', this.data.userInfo.id)
+          .eq('user_id', userId)  // 关键：只统计当前用户的数据
       ])
 
-      const visitedPlaces = plansResult.count || 0
-      const favoriteRoutes = favoritesResult.count || 0
+      const visitedPlaces = results[0].count || 0
+      const favoriteRoutes = results[1].count || 0
 
       this.setData({
         stats: {
@@ -554,21 +585,16 @@ Page({
       content: '确定要退出登录吗？',
       success: (res) => {
         if (res.confirm) {
-          // 清除本地存储和全局状态
-          wx.removeStorageSync('userInfo')
-          app.globalData.userInfo = null
-          app.globalData.isLoggedIn = false
+          // 使用Auth工具清除登录信息
+          Auth.clearUserLogin()
 
           // 更新页面状态
           this.setData({ 
             userInfo: null,
-            stats: { visitedPlaces: 0, favoriteRoutes: 0 }
-          })
-
-          // 清除相关数据
-          this.setData({
+            stats: { visitedPlaces: 0, favoriteRoutes: 0 },
+            myTravelPlans: [],
             travelPlans: [],
-            myTravelPlans: []
+            aiRecommendations: []
           })
 
           wx.showToast({
@@ -617,11 +643,12 @@ Page({
 
   // 显示用户个人资料
   showUserProfile() {
-    const { userInfo, stats } = this.data
+    const userInfo = this.data.userInfo;
+      const stats = this.data.stats;
     
     wx.showModal({
       title: '个人资料',
-      content: `姓名：${userInfo.name}\n登录方式：${userInfo.loginType === 'wechat' ? '微信登录' : '账号登录'}\n去过的地方：${stats.visitedPlaces}\n收藏路线：${stats.favoriteRoutes}`,
+      content: '姓名：' + userInfo.name + '\n登录方式：' + (userInfo.loginType === 'wechat' ? '微信登录' : '账号登录') + '\n去过的地方：' + stats.visitedPlaces + '\n收藏路线：' + stats.favoriteRoutes,
       showCancel: false,
       confirmText: '知道了'
     })

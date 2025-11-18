@@ -1,13 +1,15 @@
 // utils/ai-integration.js - AI 集成工具类
 const aiService = require('./ai-service').aiService
-const completeDb = require('./complete_database').completeDb
+const db = require('./database').db
+const supabase = require('./supabase').supabase
 
 class AIIntegration {
   // 智能行程规划
   async planIntelligentItinerary(userId, userInput) {
     try {
       // 获取用户偏好
-      const { data: preferences } = await completeDb.userPreferences.getByUserId(userId)
+      const preferencesResult = await db.userPreferences.getByUserId(userId);
+      const preferences = preferencesResult.data;
       
       // 生成行程计划
       const aiResponse = await aiService.generateTravelPlan(userInput, preferences || {})
@@ -16,7 +18,7 @@ class AIIntegration {
       const planData = this.parseAIResponseToPlan(aiResponse, userId)
       
       if (planData) {
-        const { data, error } = await completeDb.travelPlans.create({
+        const result = await db.travelPlans.create({
           user_id: userId,
           title: planData.title,
           description: planData.description,
@@ -31,7 +33,7 @@ class AIIntegration {
           accommodation: planData.accommodation
         })
         
-        return { success: true, data, aiResponse }
+        return { success: true, data: result.data, aiResponse }
       }
       
       return { success: false, aiResponse }
@@ -45,10 +47,12 @@ class AIIntegration {
   async getSmartDestinationRecommendations(userId, currentLocation = null) {
     try {
       // 获取用户偏好
-      const { data: preferences } = await completeDb.userPreferences.getByUserId(userId)
+      const preferencesResult = await db.userPreferences.getByUserId(userId);
+      const preferences = preferencesResult.data;
       
       // 获取用户历史收藏
-      const { data: favorites } = await completeDb.favorites.getUserFavorites(userId, 'destination')
+      const favoritesResult = await db.favorites.getUserFavorites(userId, 'destination');
+      const favorites = favoritesResult.data;
       
       // 生成AI推荐
       const aiResponse = await aiService.recommendDestinations(
@@ -79,16 +83,22 @@ class AIIntegration {
       const routeData = this.parseAIRouteToData(aiResponse, routeTheme)
       
       if (routeData) {
-        const { data, error } = await supabase
+        const result = await supabase
           .from('popular_routes')
           .insert({
-            routeData: routeData,
+            title: routeData.title,
+            description: routeData.description,
+            destination: routeData.destination,
+            duration: routeData.duration,
+            budget: routeData.budget,
+            itinerary: routeData.itinerary,
+            tags: routeData.tags,
             is_ai_generated: true,
             created_by: createdBy
           })
           .select()
         
-        return { success: true, data, aiResponse }
+        return { success: true, data: result.data, aiResponse }
       }
       
       return { success: false, aiResponse }
@@ -102,7 +112,8 @@ class AIIntegration {
   async optimizeItinerary(planId, optimizationGoal = '优化时间安排') {
     try {
       // 获取行程详情
-      const { data: plan } = await completeDb.travelPlans.getById(planId)
+      const planResult = await db.travelPlans.getById(planId);
+      const plan = planResult.data;
       
       if (!plan) {
         return { success: false, error: '行程不存在' }
@@ -120,11 +131,11 @@ class AIIntegration {
       }
       
       // 这里可以保存到专门的优化建议表，或者更新计划字段
-      const { data, error } = await completeDb.travelPlans.update(planId, {
+      const updateResult = await db.travelPlans.update(planId, {
         ai_optimization_suggestions: optimizationData
       })
       
-      return { success: true, data, aiResponse }
+      return { success: true, data: updateResult.data, aiResponse }
     } catch (error) {
       console.error('行程优化失败:', error)
       return { success: false, error: error.message }
@@ -134,9 +145,10 @@ class AIIntegration {
   // 智能问答
   async askTravelQuestion(userId, question, context = {}) {
     try {
-      // 获取用户上下文信息
-      const { data: preferences } = await completeDb.userPreferences.getByUserId(userId)
-      const { data: recentPlans } = await completeDb.travelPlans.getByUserId(userId, 'planned', 3)
+      const preferencesResult = await db.userPreferences.getByUserId(userId);
+      const preferences = preferencesResult.data;
+      const recentPlansResult = await db.travelPlans.getByUserId(userId, 'planned', 3);
+      const recentPlans = recentPlansResult.data
       
       const enrichedContext = Object.assign({
         userPreferences: preferences,
@@ -147,8 +159,15 @@ class AIIntegration {
       
       // 保存问答记录（可选）
       // 这里可以保存到问答历史表
-      
-      return { success: true, answer: aiResponse }
+      const result = await db.qaPairs.create({
+         user_id: userId,
+         question: question,
+         answer: aiResponse,
+         context: enrichedContext,
+         created_at: new Date().toISOString()
+       })
+       
+       return { success: true, answer: aiResponse }
     } catch (error) {
       console.error('智能问答失败:', error)
       return { success: false, error: error.message }

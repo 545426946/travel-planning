@@ -1,5 +1,6 @@
 // pages/register/register.js
 const supabase = require('../../utils/supabase').supabase
+const Auth = require('../../utils/auth').Auth
 const app = getApp()
 
 Page({
@@ -64,7 +65,7 @@ Page({
 
   // 表单验证
   validateForm() {
-    const { formData } = this.data
+    const formData = this.data.formData;
     const errors = {}
     let isValid = true
 
@@ -114,11 +115,14 @@ Page({
   // 检查用户名是否存在
   async checkUsernameExists(username) {
     try {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('users')
         .select('username')
         .eq('username', username)
         .limit(1)
+
+      const data = result.data;
+      const error = result.error;
 
       if (error) throw error
       return data && data.length > 0
@@ -139,7 +143,7 @@ Page({
     this.setData({ isLoading: true })
 
     try {
-      const { formData } = this.data
+      const formData = this.data.formData;
 
       // 检查用户名是否已存在
       const usernameExists = await this.checkUsernameExists(formData.username)
@@ -158,11 +162,14 @@ Page({
         avatar: 'https://ai-public.mastergo.com/ai/img_res/65805eacde859672f105ac7cb9520d50.jpg'
       }
 
-      const { data, error } = await supabase
+      const result = await supabase
         .from('users')
         .insert(newUser)
         .select()
         .single()
+
+      const data = result.data;
+      const error = result.error;
 
       if (error) {
         throw new Error('注册失败：' + error.message)
@@ -175,13 +182,11 @@ Page({
         name: data.name,
         avatar: data.avatar,
         loginType: 'account',
-        token: 'token_' + data.id + '_' + Date.now()
+        token: Auth.generateToken(data.id)
       }
 
-      // 保存登录状态
-      app.globalData.userInfo = userInfo
-      app.globalData.isLoggedIn = true
-      wx.setStorageSync('userInfo', userInfo)
+      // 使用Auth工具保存登录状态
+      Auth.saveUserLogin(userInfo, false)
 
       wx.showToast({
         title: '注册成功',

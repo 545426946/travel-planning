@@ -50,6 +50,39 @@ page {
   border: 3rpx solid rgba(255, 255, 255, 0.4);
 }
 
+.login-btn-header {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  padding: 15rpx 30rpx;
+  line-height: 1;
+}
+
+.login-btn-profile {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  color: #ffffff;
+  border: none;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  padding: 20rpx 40rpx;
+  margin-top: 30rpx;
+}
+
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 30rpx;
+}
+
+.login-prompt text {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 28rpx;
+  margin-bottom: 20rpx;
+}
+
 .username {
   margin-left: 20rpx;
   font-size: 32rpx;
@@ -79,10 +112,26 @@ page {
   line-height: 1.5;
 }
 
-.explore-btn {
+.button-group {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 40rpx;
+  justify-content: center;
+}
+
+.explore-btn, .ai-btn {
   background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
   color: #ffffff;
   border: none;
+  border-radius: 50rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 20rpx 40rpx;
+  transition: all 0.3s ease;
+}
+
+.ai-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   border-radius: 50rpx;
   padding: 30rpx 60rpx;
   font-size: 32rpx;
@@ -283,6 +332,22 @@ page {
   background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
   color: #fff;
   border: none;
+  border-radius: 50rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 20rpx 40rpx;
+  transition: all 0.3s ease;
+}
+
+.button-row {
+  display: flex;
+  gap: 20rpx;
+  justify-content: center;
+}
+
+.ai-plan-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin-right: 20rpx;
   border-radius: 50rpx;
   padding: 25rpx 40rpx;
   font-size: 28rpx;

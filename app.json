@@ -1,6 +1,9 @@
 {
   "pages": [
-    "index/index"
+    "index/index",
+    "pages/login/login",
+    "pages/register/register",
+    "pages/ai-assistant/ai-assistant"
   ],
   "window": {
     "backgroundTextStyle": "light",

@@ -4,15 +4,21 @@
     <view class="header-section">
       <view class="top-bar">
         <text class="logo">AI Travel</text>
-        <view class="user-info">
+        <view class="user-info" wx:if="{{userInfo}}">
           <image class="user-avatar" src="{{userInfo.avatar}}" mode="aspectFill" binderror="onImageError"></image>
           <text class="username">{{userInfo.name}}</text>
+        </view>
+        <view class="user-info" wx:else>
+          <button class="login-btn-header" bindtap="goToLogin">登录</button>
         </view>
       </view>
       <view class="hero-section">
         <text class="hero-title">轻松完美旅行规划</text>
         <text class="hero-subtitle">一键探索，开启你的完美旅程</text>
-        <button class="explore-btn" bindtap="exploreDestinations">立即探索</button>
+        <view class="button-group">
+          <button class="explore-btn" bindtap="exploreDestinations">立即探索</button>
+          <button class="ai-btn" bindtap="showAIHelper">AI助手</button>
+        </view>
       </view>
     </view>
     
@@ -72,10 +78,16 @@
   <scroll-view wx:if="{{currentTab === 1}}" class="scroll-area" scroll-y>
     <view class="planner-header">
       <text class="page-title">行程规划</text>
-      <button class="add-btn" bindtap="addNewPlan">
-        <icon type="add" size="18" color="#fff"></icon>
-        新建行程
-      </button>
+      <view class="button-row">
+        <button class="add-btn ai-plan-btn" bindtap="aiPlanItinerary">
+          <icon type="success" size="18" color="#fff"></icon>
+          AI规划
+        </button>
+        <button class="add-btn" bindtap="addNewPlan">
+          <icon type="add" size="18" color="#fff"></icon>
+          新建行程
+        </button>
+      </view>
     </view>
     <view class="plan-list">
       <view wx:for="{{travelPlans}}" wx:key="index" class="plan-item">
@@ -114,18 +126,26 @@
   
   <!-- 个人主页 -->
   <scroll-view wx:if="{{currentTab === 3}}" class="scroll-area" scroll-y>
-    <view class="profile-header">
-      <image src="https://picsum.photos/seed/profile/400/400.jpg" mode="aspectFill" class="avatar" />
-      <text class="username">旅行达人小张</text>
+    <view class="profile-header" wx:if="{{userInfo}}">
+      <image src="{{userInfo.avatar}}" mode="aspectFill" class="avatar" />
+      <text class="username">{{userInfo.name}}</text>
       <view class="stats-row">
         <view class="stat-item">
-          <text class="stat-number">24</text>
+          <text class="stat-number">{{stats.visitedPlaces || 0}}</text>
           <text class="stat-label">去过的地方</text>
         </view>
         <view class="stat-item">
-          <text class="stat-number">18</text>
+          <text class="stat-number">{{stats.favoriteRoutes || 0}}</text>
           <text class="stat-label">收藏路线</text>
         </view>
+      </view>
+    </view>
+    <view class="profile-header" wx:else>
+      <image src="https://picsum.photos/seed/default-profile/400/400.jpg" mode="aspectFill" class="avatar" />
+      <text class="username">未登录</text>
+      <view class="login-prompt">
+        <text>请先登录查看个人信息</text>
+        <button class="login-btn-profile" bindtap="goToLogin">立即登录</button>
       </view>
     </view>
     

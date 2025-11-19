@@ -196,8 +196,25 @@ Page({
 
       console.log('AI规划输入:', userInput)
 
-      // 调用AI规划服务
-      const result = await aiIntegration.planIntelligentItinerary(userId, userInput)
+      // 准备表单数据传递给AI
+      const selectedInterests = this.data.interests
+        .filter(item => item.checked)
+        .map(item => ({ label: item.label, value: item.value }))
+
+      const formDataForAI = {
+        destination: this.data.formData.destination,
+        days: this.data.formData.days,
+        travelers: this.data.formData.travelers,
+        budget: this.data.formData.budget,
+        style: this.data.formData.style,
+        interests: selectedInterests,
+        specialRequirements: this.data.formData.specialRequirements
+      }
+
+      console.log('表单数据:', formDataForAI)
+
+      // 调用AI规划服务（传入表单数据）
+      const result = await aiIntegration.planIntelligentItinerary(userId, userInput, formDataForAI)
 
       this.setData({ isLoading: false })
 

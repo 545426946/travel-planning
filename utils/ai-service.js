@@ -12,26 +12,35 @@ class AIService {
   // 调用 Mistral AI API
   async callAPI(messages, options = {}) {
     try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(Object.assign({
-          model: this.model,
-          messages: messages,
-          temperature: options.temperature || 0.7,
-          max_tokens: options.maxTokens || 2000
-        }, options))
+      // 使用微信小程序的 wx.request 替代 fetch
+      const response = await new Promise((resolve, reject) => {
+        wx.request({
+          url: this.apiUrl,
+          method: 'POST',
+          header: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          data: Object.assign({
+            model: this.model,
+            messages: messages,
+            temperature: options.temperature || 0.7,
+            max_tokens: options.maxTokens || 2000
+          }, options),
+          success: (res) => {
+            resolve(res)
+          },
+          fail: (err) => {
+            reject(err)
+          }
+        })
       })
 
-      if (!response.ok) {
-        throw new Error(`AI API 错误: ${response.status} ${response.statusText}`)
+      if (response.statusCode !== 200) {
+        throw new Error(`AI API 错误: ${response.statusCode} ${response.data}`)
       }
 
-      const data = await response.json()
-      return data.choices[0].message.content
+      return response.data.choices[0].message.content
     } catch (error) {
       console.error('AI 服务调用失败:', error)
       throw error

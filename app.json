@@ -4,7 +4,10 @@
     "pages/login/login",
     "pages/register/register",
     "pages/ai-plan/ai-plan",
-    "pages/ai-assistant/ai-assistant"
+    "pages/ai-assistant/ai-assistant",
+    "pages/travel-plans/travel-plans",
+    "pages/plan-detail/plan-detail",
+    "pages/create-plan/create-plan"
   ],
   "window": {
     "backgroundTextStyle": "light",

@@ -5,7 +5,7 @@ const supabase = require('./supabase').supabase
 
 class AIIntegration {
   // 智能行程规划
-  async planIntelligentItinerary(userId, userInput) {
+  async planIntelligentItinerary(userId, userInput, formData = {}) {
     try {
       // 获取用户偏好
       const preferencesResult = await db.userPreferences.getByUserId(userId);
@@ -14,8 +14,8 @@ class AIIntegration {
       // 生成行程计划
       const aiResponse = await aiService.generateTravelPlan(userInput, preferences || {})
       
-      // 解析AI响应并保存行程
-      const planData = this.parseAIResponseToPlan(aiResponse, userId)
+      // 解析AI响应并保存行程（传入用户表单数据）
+      const planData = this.parseAIResponseToPlan(aiResponse, userId, formData)
       
       if (planData) {
         const result = await db.travelPlans.create({
@@ -26,11 +26,17 @@ class AIIntegration {
           start_date: planData.startDate,
           end_date: planData.endDate,
           total_budget: planData.budget,
+          total_days: planData.totalDays,
+          travelers_count: planData.travelersCount,
+          travel_style: planData.travelStyle,
+          interests: planData.interests,
           itinerary: planData.itinerary,
           is_ai_generated: true,
+          status: 'planned',
           tags: planData.tags,
           transportation: planData.transportation,
-          accommodation: planData.accommodation
+          accommodation: planData.accommodation,
+          special_requirements: planData.specialRequirements
         })
         
         return { success: true, data: result.data, aiResponse }
@@ -221,25 +227,63 @@ class AIIntegration {
   }
 
   // 解析AI行程响应
-  parseAIResponseToPlan(aiResponse, userId) {
+  parseAIResponseToPlan(aiResponse, userId, formData = {}) {
     try {
-      // 这里实现AI响应解析逻辑
-      // 可以根据实际AI输出格式进行调整
+      // 从用户表单数据中提取基础信息
+      const destination = formData.destination || this.extractDestination(aiResponse)
+      const budget = formData.budget || this.extractBudget(aiResponse)
+      const days = formData.days || '3天'
+      const travelers = formData.travelers || 1
+      const style = formData.style || 'comfortable'
+      const interests = formData.interests || []
+      const specialRequirements = formData.specialRequirements || ''
       
-      const lines = aiResponse.split('\n').filter(line => line.trim())
+      // 计算总天数
+      const totalDays = parseInt(days) || 3
       
-      // 简化的解析逻辑 - 实际实现需要更复杂的NLP处理
+      // 计算日期范围（从今天开始）
+      const today = new Date()
+      const startDate = today.toISOString().split('T')[0]
+      const endDate = new Date(today.getTime() + (totalDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      // 生成标题
+      const title = `${destination}${days}游 - AI智能规划`
+      
+      // 生成描述（从AI响应中提取前200字）
+      const description = aiResponse.substring(0, 200).replace(/\n/g, ' ')
+      
+      // 提取标签
+      const tags = this.extractTags(aiResponse)
+      // 添加兴趣标签
+      if (Array.isArray(interests)) {
+        tags.push(...interests.map(i => i.label || i))
+      }
+      // 添加风格标签
+      const styleMap = {
+        luxury: '轻奢型',
+        comfortable: '舒适享受',
+        premium: '奢华体验'
+      }
+      if (styleMap[style]) {
+        tags.push(styleMap[style])
+      }
+      
       return {
-        title: this.extractTitle(aiResponse),
-        description: this.extractDescription(aiResponse),
-        destination: this.extractDestination(aiResponse),
-        startDate: null, // 需要从用户输入或AI响应中解析
-        endDate: null,
-        budget: this.extractBudget(aiResponse),
-        itinerary: aiResponse,
-        tags: this.extractTags(aiResponse),
+        title: title,
+        description: description,
+        destination: destination,
+        startDate: startDate,
+        endDate: endDate,
+        budget: parseFloat(budget) || 0,
+        totalDays: totalDays,
+        travelersCount: parseInt(travelers) || 1,
+        travelStyle: style,
+        interests: Array.isArray(interests) ? JSON.stringify(interests) : interests,
+        itinerary: aiResponse,  // 完整的AI响应作为行程详情
+        tags: tags,
         transportation: this.extractTransportation(aiResponse),
-        accommodation: this.extractAccommodation(aiResponse)
+        accommodation: this.extractAccommodation(aiResponse),
+        specialRequirements: specialRequirements
       }
     } catch (error) {
       console.error('解析AI响应失败:', error)
@@ -252,7 +296,7 @@ class AIIntegration {
     // 解析AI推荐的景点列表
     return {
       destinations: [], // 解析后的景点列表
-      summary: aiResponse.substring(0, 200) + '点', // 摘要
+      summary: aiResponse.substring(0, 200) + '...', // 摘要
       fullResponse: aiResponse
     }
   }
@@ -261,7 +305,7 @@ class AIIntegration {
   parseAIRouteToData(aiResponse, theme) {
     return {
       title: theme + '主题路线',
-      description: aiResponse.substring(0, 500) + '描述',
+      description: aiResponse.substring(0, 500),
       itinerary: aiResponse,
       tags: [theme, 'AI生成'],
       difficulty_level: 2,
@@ -283,7 +327,7 @@ class AIIntegration {
   // 解析景点描述
   parseDestinationDescription(aiResponse) {
     return {
-      short: aiResponse.substring(0, 200) + '短',
+      short: aiResponse.substring(0, 200),
       full: aiResponse,
       tags: ['热门推荐']
     }
@@ -297,7 +341,7 @@ class AIIntegration {
 
   extractDescription(text) {
     const lines = text.split('\n').filter(line => line.trim())
-    return lines.slice(0, 3).join(' ').substring(0, 200) + '描述'
+    return lines.slice(0, 3).join(' ').substring(0, 200)
   }
 
   extractDestination(text) {
@@ -311,7 +355,7 @@ class AIIntegration {
   }
 
   extractTags(text) {
-    const tags = []
+    const tags = ['AI规划']
     if (text.includes('自然')) tags.push('自然风光')
     if (text.includes('文化')) tags.push('文化历史')
     if (text.includes('美食')) tags.push('美食')

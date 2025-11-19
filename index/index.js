@@ -274,6 +274,14 @@ Page({
     const index = parseInt(e.currentTarget.dataset.index);
     console.log('切换到Tab索引:', index);
     if (!isNaN(index)) {
+      // 如果是行程规划Tab（索引1），跳转到行程规划页面
+      if (index === 1) {
+        wx.navigateTo({
+          url: '/pages/travel-plans/travel-plans'
+        });
+        return;
+      }
+      
       this.setData({
         currentTab: index
       });

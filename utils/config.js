@@ -6,7 +6,10 @@ const getAppConfig = () => {
   try {
     // 尝试从 app.js 的 globalData 获取配置
     const app = getApp()
-    return app.globalData.config || {}
+    if (app && app.globalData && app.globalData.config) {
+      return app.globalData.config
+    }
+    return {}
   } catch (error) {
     console.warn('无法获取应用配置，使用默认配置')
     return {}

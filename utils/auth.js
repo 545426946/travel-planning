@@ -1,18 +1,30 @@
 // utils/auth.js - 用户认证和权限管理工具
 
-const app = getApp()
-
 /**
  * 权限验证工具类
  */
 class Auth {
+  /**
+   * 安全获取App实例
+   * @returns {Object|null} App实例或null
+   */
+  static getAppInstance() {
+    try {
+      return getApp()
+    } catch (error) {
+      // App实例还未初始化
+      return null
+    }
+  }
+
   /**
    * 获取当前登录用户信息
    * @returns {Object|null} 用户信息对象，未登录返回null
    */
   static getCurrentUser() {
     // 优先从全局状态获取
-    if (app.globalData && app.globalData.userInfo) {
+    const app = this.getAppInstance()
+    if (app && app.globalData && app.globalData.userInfo) {
       return app.globalData.userInfo
     }
     
@@ -21,7 +33,7 @@ class Auth {
       const userInfo = wx.getStorageSync('userInfo')
       if (userInfo) {
         // 同步到全局状态
-        if (app.globalData) {
+        if (app && app.globalData) {
           app.globalData.userInfo = userInfo
           app.globalData.isLoggedIn = true
         }
@@ -118,7 +130,8 @@ class Auth {
    */
   static saveUserLogin(userInfo, rememberMe = false) {
     // 保存到全局状态
-    if (app.globalData) {
+    const app = this.getAppInstance()
+    if (app && app.globalData) {
       app.globalData.userInfo = userInfo
       app.globalData.isLoggedIn = true
     }
@@ -148,7 +161,8 @@ class Auth {
    */
   static clearUserLogin() {
     // 清除全局状态
-    if (app.globalData) {
+    const app = this.getAppInstance()
+    if (app && app.globalData) {
       app.globalData.userInfo = null
       app.globalData.isLoggedIn = false
     }

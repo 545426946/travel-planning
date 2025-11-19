@@ -298,50 +298,10 @@ Page({
       return
     }
 
-    const userId = Auth.getCurrentUserId()
-
-    wx.showModal({
-      title: 'AI 智能规划',
-      content: '请描述您的旅行需求，例如：我想去云南大理丽江玩5天，预算3000元，喜欢自然风光和古镇文化',
-      editable: true,
-      placeholderText: '输入您的旅行需求',
-      success: async (res) => {
-        if (res.confirm && res.content.trim()) {
-          wx.showLoading({ title: 'AI 正在规划...' });
-          
-          try {
-            const result = await aiIntegration.planIntelligentItinerary(
-              userId, 
-              res.content
-            );
-
-            wx.hideLoading();
-
-            if (result.success) {
-              wx.showToast({
-                title: 'AI 规划成功',
-                icon: 'success'
-              });
-
-              // 重新加载用户的行程数据
-              await this.loadUserTravelPlans();
-
-              // 显示AI生成结果
-              this.showAIResultModal('行程规划结果', result.aiResponse);
-            } else {
-              this.showAIResultModal('AI 规划建议', result.aiResponse);
-            }
-          } catch (error) {
-            wx.hideLoading();
-            console.error('AI 规划失败:', error);
-            wx.showToast({
-              title: 'AI 规划失败',
-              icon: 'none'
-            });
-          }
-        }
-      }
-    });
+    // 跳转到AI规划页面
+    wx.navigateTo({
+      url: '/pages/ai-plan/ai-plan'
+    })
   },
 
   // 智能景点推荐
